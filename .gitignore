@@ -26,7 +26,7 @@ build/
 # 但忽略編譯中產生的其他不需要的快取
 !dist/
 dist/*
-!dist/main.exe
+!dist/EyesProtector.exe
 
 # OS 產生檔案
 .DS_Store
