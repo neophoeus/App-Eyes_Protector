@@ -1,0 +1,33 @@
+# Python 原生暫存與編譯檔案
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# 環境設定
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 開發工具
+.vscode/
+.idea/
+.spyderproject
+.ropeproject
+
+# PyInstaller 產生物件
+*.spec
+build/
+# 由於這是一個可以直接執行的可攜軟體，決定將 dist 放進版本控制讓其他人可以直接下載 exe
+# 但忽略編譯中產生的其他不需要的快取
+!dist/
+dist/*
+!dist/main.exe
+
+# OS 產生檔案
+.DS_Store
+Thumbs.db
