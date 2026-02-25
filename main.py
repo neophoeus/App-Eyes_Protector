@@ -1,9 +1,11 @@
 import tkinter as tk
+from tkinter import messagebox
 import time
 import threading
 import ctypes
 import winsound
 import sys
+import os
 import math
 import random
 
@@ -25,7 +27,13 @@ def is_fullscreen_or_busy():
     try:
         hr = ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state))
         if hr == 0:
-            if state.value in (2, 3, 4, 7):
+            # 狀態碼定義參考:
+            # QUNS_NOT_PRESENT = 1
+            # QUNS_BUSY = 2 (全螢幕獨佔模式，例如遊戲)
+            # QUNS_RUNNING_D3D_FULL_SCREEN = 3 (Direct3D全螢幕)
+            # QUNS_PRESENTATION_MODE = 4 (簡報模式)
+            # 為了避免一般視窗被誤判，只略過 D3D 全螢幕遊戲(3)與簡報(4)
+            if state.value in (3, 4):
                 return True
     except Exception:
         pass
@@ -220,7 +228,7 @@ class FullScreenBreak:
         # 加入極簡的打叉按鈕 
         btn_font = ("Segoe UI", 24) 
         self.btn_quit = tk.Button(self.window, text="✕", font=btn_font, bg=self.bg_color, fg="#b0bec5", 
-                             relief=tk.FLAT, cursor="hand2", command=self.controller.quit_app,
+                             relief=tk.FLAT, cursor="hand2", command=self.finish_early,
                              activebackground="#c8e6c9", activeforeground="#2c3e50")
         self.btn_quit.place(relx=1.0, rely=0.0, anchor="ne", x=-30, y=30)
         
@@ -303,10 +311,133 @@ class FullScreenBreak:
             winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
             self.window.after(2000, self.finish)
 
+    def finish_early(self):
+        self.animating = False
+        self._update_text("\n\n休息中斷，回到工作站！\n\n")
+        winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
+        self.window.after(1000, self.finish)
+
     def finish(self):
         self.hide()
         self.controller.finish_break()
 
+
+class FloatingWidget:
+    """半透明懸浮狀態窗格，用 Canvas 方形圓角美化"""
+    def __init__(self, controller):
+        self.controller = controller
+        self.window = tk.Toplevel()
+        self.window.attributes("-topmost", True)
+        self.window.overrideredirect(True)
+        # 使用 transparentcolor 完美去背
+        self.window.attributes("-transparentcolor", "#000000")
+        self.window.attributes("-alpha", 0.6)
+        
+        self.bg_color_normal = "#e8f5e9"
+        self.bg_color_hover = "#ffffff"
+        
+        # 畫布保持全開大小 (130x44)，底色為去背色
+        self.canvas = tk.Canvas(self.window, bg="#000000", highlightthickness=0, width=130, height=44)
+        self.canvas.pack()
+        
+        # 建立圓角矩形的方法
+        self.r = 16 # 圓角半徑
+        self.normal_coords = (2, 2, 42, 42) # 平常是 40x40 的方形圓角 (正圓/圓矩形)
+        self.hover_coords = (2, 2, 128, 42) # Hover時展開成大的圓角矩形
+        
+        points = self._get_round_rect_points(*self.normal_coords, self.r)
+        self.bg_id = self.canvas.create_polygon(points, smooth=True, fill=self.bg_color_normal, outline="#a5d6a7", width=2)
+        
+        # 圖示置中於左側 40x40 區塊內 (中心為 x=22, y=22)
+        self.txt_icon = self.canvas.create_text(22, 22, text="👁️", font=("Segoe UI Emoji", 14), fill="#2c3e50")
+        
+        # 文字與按鈕 (展開後顯示)
+        self.txt_label = self.canvas.create_text(65, 22, text="", font=("Microsoft JhengHei", 10, "bold"), fill="#27ae60")
+        self.btn_close = self.canvas.create_text(110, 22, text="✕", font=("Microsoft JhengHei", 11, "bold"), fill="#e74c3c", state="hidden")
+        
+        # 事件綁定：拖曳與點擊
+        self.canvas.bind("<ButtonPress-1>", self.start_move)
+        self.canvas.bind("<B1-Motion>", self.do_move)
+        self.canvas.bind("<ButtonRelease-1>", self.on_click)
+        
+        # 事件綁定：Hover
+        self.canvas.bind("<Enter>", self.on_hover)
+        self.canvas.bind("<Leave>", self.on_leave)
+        
+        # 初始位置
+        self.window.update_idletasks()
+        sw = self.window.winfo_screenwidth()
+        sh = self.window.winfo_screenheight()
+        w, h = 130, 44
+        x = sw - w - 40
+        y = sh - h - 80
+        self.window.geometry(f"{w}x{h}+{x}+{y}") 
+        self._x = 0
+        self._y = 0
+        self._dragged = False
+
+    def _get_round_rect_points(self, x1, y1, x2, y2, r):
+        # 為了搭配 create_polygon(smooth=True)，我們需要給予重複的控制點讓 bezier 曲線能在角落緊縮
+        return [
+            x1+r, y1,  x1+r, y1,  x2-r, y1,  x2-r, y1,
+            x2, y1,    x2, y1+r,  x2, y1+r,  x2, y2-r,  x2, y2-r,
+            x2, y2,    x2-r, y2,  x2-r, y2,  x1+r, y2,  x1+r, y2,
+            x1, y2,    x1, y2-r,  x1, y2-r,  x1, y1+r,  x1, y1+r,
+            x1, y1
+        ]
+
+    def start_move(self, event):
+        self._x = event.x
+        self._y = event.y
+        self._dragged = False
+
+    def do_move(self, event):
+        self._dragged = True
+        deltax = event.x - self._x
+        deltay = event.y - self._y
+        x = self.window.winfo_x() + deltax
+        y = self.window.winfo_y() + deltay
+        self.window.geometry(f"+{x}+{y}")
+
+    def on_click(self, event):
+        # 點擊右側範圍即判定為按下關閉
+        if not self._dragged and event.x > 90:
+            if self.canvas.itemcget(self.btn_close, "state") == "normal":
+                self.controller.quit_app()
+
+    def on_hover(self, e):
+        # 變換形狀至展開
+        self.window.attributes("-alpha", 0.95)
+        new_points = self._get_round_rect_points(*self.hover_coords, self.r)
+        self.canvas.coords(self.bg_id, *new_points)
+        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline="#81c784")
+        self.canvas.itemconfig(self.txt_label, text="保護中")
+        self.canvas.itemconfig(self.btn_close, state="normal")
+        self.window.config(cursor="hand2")
+
+    def on_leave(self, e):
+        x, y = self.window.winfo_pointerxy()
+        wx = self.window.winfo_rootx()
+        wy = self.window.winfo_rooty()
+        ww = self.window.winfo_width()
+        wh = self.window.winfo_height()
+        if not (wx <= x <= wx + ww and wy <= y <= wy + wh):
+            self.window.attributes("-alpha", 0.6)
+            # 縮回成原本的小正方圓角狀
+            old_points = self._get_round_rect_points(*self.normal_coords, self.r)
+            self.canvas.coords(self.bg_id, *old_points)
+            self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
+            self.canvas.itemconfig(self.txt_label, text="")
+            self.canvas.itemconfig(self.btn_close, state="hidden")
+            self.window.config(cursor="arrow")
+
+    def hide(self):
+        if self.window.state() != "withdrawn":
+            self.window.withdraw()
+            
+    def show(self):
+        if self.window.state() == "withdrawn":
+            self.window.deiconify()
 
 # ================= 主控制器 =================
 class EyesProtectorController:
@@ -316,6 +447,8 @@ class EyesProtectorController:
         
         self.dialog = CenterReminderDialog(self)
         self.fullscreen = FullScreenBreak(self)
+        self.floating = FloatingWidget(self)
+        self.root.after(100, self.floating.show) # 確保強迫顯示在最上層
         
         self.time_elapsed = 0
         self.target_interval = BREAK_INTERVAL
@@ -334,11 +467,15 @@ class EyesProtectorController:
                 
             if is_fullscreen_or_busy():
                 self.time_elapsed = 0
+                self.root.after(0, self.floating.hide)
                 continue
+            else:
+                self.root.after(0, self.floating.show)
                 
             self.time_elapsed += POLL_INTERVAL
             if self.time_elapsed >= self.target_interval:
                 self.state = "DIALOG_VISIBLE"
+                self.root.after(0, self.floating.hide)
                 self.root.after(0, self.dialog.show)
 
     def snooze(self):
@@ -348,6 +485,7 @@ class EyesProtectorController:
 
     def start_full_break(self):
         self.state = "BREAKING"
+        self.root.after(0, self.floating.hide)
         self.root.after(0, self.fullscreen.show)
 
     def finish_break(self):
@@ -357,13 +495,43 @@ class EyesProtectorController:
         
     def quit_app(self):
         self.running = False
-        self.dialog.window.destroy()
-        self.fullscreen.window.destroy()
+        try:
+            self.floating.window.destroy()
+        except: pass
+        try:
+            self.dialog.window.destroy()
+        except: pass
+        try:
+            self.fullscreen.window.destroy()
+        except: pass
         self.root.destroy()
         sys.exit(0)
 
 
+def check_single_instance(root):
+    ERROR_ALREADY_EXISTS = 183
+    mutex_name = "Global\\AppEyesProtectorMutex_1_0"
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
+    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+        root.withdraw()
+        # 讓 MessageBox 獨立顯示而且置頂
+        root.attributes("-topmost", True)
+        if messagebox.askyesno(
+            "App-Eyes Protector",
+            "護眼助理目前正在背景為您倒數計時中。\n\n您想要完全「強制關閉」這個軟體嗎？\n(按下「是」將會結束常駐保護)",
+            parent=root
+        ):
+            # 點擊 Yes，強制結束所有正在執行的 EyesProtector 行程
+            os.system('taskkill /F /IM EyesProtector.exe /T >nul 2>&1')
+            os.system('taskkill /F /IM main.exe /T >nul 2>&1') # 防呆
+        sys.exit(0)
+    # 存下 mutex 防止被垃圾回收機制清除
+    root.mutex = mutex
+
 if __name__ == "__main__":
     root = tk.Tk()
+    root.withdraw() # 確保在 check 前隱藏
+    check_single_instance(root)
+    
     app = EyesProtectorController(root)
     root.mainloop()

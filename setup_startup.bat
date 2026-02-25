@@ -2,12 +2,12 @@
 chcp 65001 >nul
 echo Configuring App-Eyes_Protector to run at startup...
 
-:: Get absolute path of main.exe in current directory
-set "EXE_PATH=%~dp0dist\main.exe"
+:: Get absolute path of EyesProtector.exe in current directory
+set "EXE_PATH=%~dp0dist\EyesProtector.exe"
 
 :: Check if exe exists
 if not exist "%EXE_PATH%" (
-    echo [ERROR] main.exe not found! Please check if compilation was successful.
+    echo [ERROR] EyesProtector.exe not found! Please check if compilation was successful.
     pause
     exit /b
 )
@@ -23,6 +23,6 @@ powershell -Command "$wshell = New-Object -ComObject WScript.Shell; $shortcut = 
 echo.
 echo ==============================================
 echo Setup successful! App-Eyes_Protector will automatically run on next startup.
-echo To test it right now, double click main.exe in the dist folder.
+echo To test it right now, double click EyesProtector.exe in the dist folder.
 echo ==============================================
 pause
