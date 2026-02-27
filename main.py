@@ -46,7 +46,7 @@ class Leaf:
         self.id = self.canvas.create_polygon(0, 0, 0, 0, 0, 0, fill=self.color, outline="")
     def _get_leaf_points(self, cx, cy, angle, scale, squeeze):
         points = []
-        resolution = 6 # 大幅降低多邊形解析度，因為在飄散中細節不重要
+        resolution = 6
         for i in range(resolution):
             t = (i / resolution) * math.pi * 2
             px = math.sin(t) * (scale * 0.3)
@@ -164,7 +164,7 @@ class FullScreenBreak:
         self.canvas.tag_bind(self.close_id, "<ButtonRelease-1>", lambda e: self.finish_early())
         self.canvas.tag_bind(self.close_id, "<Enter>", lambda e: self.canvas.itemconfig(self.close_id, fill="#2c3e50"))
         self.canvas.tag_bind(self.close_id, "<Leave>", lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"))
-        self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(15)] # 減少葉子數量以降低 CPU 負擔
+        self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(15)]
         self.canvas.tag_raise(self.txt_shadow)
         self.canvas.tag_raise(self.txt_main)
         self.canvas.tag_raise(self.close_id)
@@ -177,7 +177,6 @@ class FullScreenBreak:
         current_time = time.time() - self.start_time
         for leaf in self.leaves:
             leaf.update(current_time * 15)
-        # 更新率從 33ms (約 30FPS) 降到 66ms (約 15FPS)
         self.window.after(66, self._animation_loop)
     def show(self):
         self.window.update_idletasks()
