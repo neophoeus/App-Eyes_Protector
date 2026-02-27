@@ -90,12 +90,14 @@ class CenterReminderDialog:
         lbl_msg.pack(padx=30, pady=(0, 30))
         btn_frame = tk.Frame(frame, bg="#ffffff")
         btn_frame.pack(fill=tk.X, padx=40, pady=(0, 35))
-        btn_rest = tk.Button(btn_frame, text="開始放鬆 (20秒)", font=btn_font, bg="#27ae60", fg="white",
+        btn_rest = tk.Button(btn_frame, text="開始放鬆 (20秒)  ⏎", font=btn_font, bg="#27ae60", fg="white",
                              relief=tk.FLAT, cursor="hand2", command=self.on_rest, activebackground="#2ecc71", pady=10)
         btn_rest.pack(side=tk.TOP, expand=True, fill=tk.X, pady=(0, 15))
-        btn_snooze = tk.Button(btn_frame, text="稍後提醒 (5分鐘)", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#95a5a6",
+        btn_snooze = tk.Button(btn_frame, text="稍後提醒 (5分鐘)  Esc", font=("Microsoft JhengHei", 10), bg="#ffffff", fg="#95a5a6",
                                relief=tk.FLAT, cursor="hand2", command=self.on_snooze, activebackground="#f5f6fa", activeforeground="#7f8c8d", pady=5)
         btn_snooze.pack(side=tk.TOP, expand=True, fill=tk.X)
+        self.window.bind("<Return>", lambda e: self.on_rest())
+        self.window.bind("<Escape>", lambda e: self.on_snooze())
     def show(self):
         w, h = 420, 320
         sw = self.window.winfo_screenwidth()
@@ -121,35 +123,30 @@ class FullScreenBreak:
         self.window.withdraw()
         self.window.attributes("-topmost", True)
         self.window.attributes("-fullscreen", True)
-        self.bg_color = "#e8f5e9" # 淺薄荷綠至白色的清新底色感
+        self.bg_color = "#e8f5e9"
         self.window.configure(bg=self.bg_color)
         self.canvas = tk.Canvas(self.window, bg=self.bg_color, highlightthickness=0)
         self.canvas.place(x=0, y=0, relwidth=1, relheight=1)
         title_font = ("Microsoft JhengHei", 36)
+        sw = self.window.winfo_screenwidth()
+        sh = self.window.winfo_screenheight()
         self.txt_shadow = self.canvas.create_text(
-            self.window.winfo_screenwidth()//2 + 2,
-            self.window.winfo_screenheight()//2 + 2,
+            sw//2 + 2, sh//2 + 2,
             text="", font=title_font, fill="#c8e6c9", justify=tk.CENTER
         )
         self.txt_main = self.canvas.create_text(
-            self.window.winfo_screenwidth()//2,
-            self.window.winfo_screenheight()//2,
+            sw//2, sh//2,
             text="", font=title_font, fill="#2c3e50", justify=tk.CENTER
         )
-        btn_font = ("Segoe UI", 24)
-        self.btn_quit = tk.Button(self.window, text="✕", font=btn_font, bg=self.bg_color, fg="#b0bec5",
-                             relief=tk.FLAT, cursor="hand2", command=self.finish_early,
-                             activebackground="#c8e6c9", activeforeground="#2c3e50")
-        self.btn_quit.place(relx=1.0, rely=0.0, anchor="ne", x=-30, y=30)
-        self.btn_quit.bind("<Enter>", self.on_quit_hover)
-        self.btn_quit.bind("<Leave>", self.on_quit_leave)
+        self.close_id = self.canvas.create_text(
+            sw - 50, 40, text="✕", font=("Segoe UI", 22), fill="#b0bec5"
+        )
+        self.canvas.tag_bind(self.close_id, "<ButtonRelease-1>", lambda e: self.finish_early())
+        self.canvas.tag_bind(self.close_id, "<Enter>", lambda e: self.canvas.itemconfig(self.close_id, fill="#2c3e50"))
+        self.canvas.tag_bind(self.close_id, "<Leave>", lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"))
         self.leaves = []
         self.animating = False
         self.start_time = 0
-    def on_quit_hover(self, e):
-        self.btn_quit.config(fg="#2c3e50")
-    def on_quit_leave(self, e):
-        self.btn_quit.config(fg="#b0bec5")
     def init_geometry(self):
         self.canvas.delete("all")
         sw = self.window.winfo_screenwidth()
@@ -161,9 +158,16 @@ class FullScreenBreak:
         self.txt_main = self.canvas.create_text(
             sw//2, sh//2, text="", font=title_font, fill="#2c3e50", justify=tk.CENTER
         )
+        self.close_id = self.canvas.create_text(
+            sw - 50, 40, text="✕", font=("Segoe UI", 22), fill="#b0bec5"
+        )
+        self.canvas.tag_bind(self.close_id, "<ButtonRelease-1>", lambda e: self.finish_early())
+        self.canvas.tag_bind(self.close_id, "<Enter>", lambda e: self.canvas.itemconfig(self.close_id, fill="#2c3e50"))
+        self.canvas.tag_bind(self.close_id, "<Leave>", lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"))
         self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(30)]
         self.canvas.tag_raise(self.txt_shadow)
         self.canvas.tag_raise(self.txt_main)
+        self.canvas.tag_raise(self.close_id)
     def _update_text(self, text):
         self.canvas.itemconfig(self.txt_shadow, text=text)
         self.canvas.itemconfig(self.txt_main, text=text)
@@ -182,7 +186,7 @@ class FullScreenBreak:
         self.window.deiconify()
         self.window.focus_force()
         self.window.attributes("-topmost", True)
-        self._update_text("放空思緒，讓心跳跟著微風慢下來...")
+        self._update_text("🌿 20-20-20 護眼時刻\n\n看向 20 呎遠的地方，放鬆你的雙眼...")
         self._animation_loop()
         self._countdown_step(BREAK_DURATION)
     def hide(self):
@@ -190,15 +194,15 @@ class FullScreenBreak:
         self.window.withdraw()
     def _countdown_step(self, remaining):
         if remaining > 0:
-            self._update_text(f"放空思緒，讓心跳跟著微風慢下來...\n\n剩 餘 {remaining} 秒")
+            self._update_text(f"🌿 20-20-20 護眼時刻\n\n看向 20 呎遠的地方，放鬆你的雙眼...\n\n剩 餘 {remaining} 秒")
             self.window.after(1000, self._countdown_step, remaining - 1)
         else:
-            self._update_text("\n\n充電完成，回到工作站！\n\n")
+            self._update_text("\n\n✨ 眼睛充電完成！\n回到工作站吧！\n\n")
             winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
             self.window.after(2000, self.finish)
     def finish_early(self):
         self.animating = False
-        self._update_text("\n\n休息中斷，回到工作站！\n\n")
+        self._update_text("\n\n⏩ 休息中斷，回到工作站！\n\n")
         winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
         self.window.after(1000, self.finish)
     def finish(self):
