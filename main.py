@@ -22,11 +22,24 @@ def is_fullscreen_or_busy():
     try:
         hr = ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state))
         if hr == 0:
-            if state.value in (3, 4):
+            if state.value in (1, 2, 3, 4, 7):
                 return True
     except Exception:
         pass
     return False
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_uint),
+        ("dwTime", ctypes.c_uint)
+    ]
+def get_idle_time():
+    lii = LASTINPUTINFO()
+    lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
+    if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+        tick = ctypes.windll.kernel32.GetTickCount()
+        elapsed = (tick - lii.dwTime) & 0xFFFFFFFF
+        return elapsed / 1000.0
+    return 0.0
 class Leaf:
     def __init__(self, canvas, sw, sh):
         self.canvas = canvas
@@ -313,7 +326,9 @@ class EyesProtectorController:
             time.sleep(POLL_INTERVAL)
             if self.state != "RUNNING":
                 continue
-            if is_fullscreen_or_busy():
+            idle_sec = get_idle_time()
+            idle_threshold = 20 if "--test" in sys.argv else 300
+            if is_fullscreen_or_busy() or idle_sec >= idle_threshold:
                 self.time_elapsed = 0
                 self.root.after(0, self.floating.hide)
                 continue
