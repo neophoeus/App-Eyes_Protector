@@ -22,7 +22,7 @@ def is_fullscreen_or_busy():
     try:
         hr = ctypes.windll.shell32.SHQueryUserNotificationState(ctypes.byref(state))
         if hr == 0:
-            if state.value in (1, 2, 3, 4, 7):
+            if state.value in (3, 4):
                 return True
     except Exception:
         pass
