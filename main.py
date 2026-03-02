@@ -140,23 +140,6 @@ class FullScreenBreak:
         self.window.configure(bg=self.bg_color)
         self.canvas = tk.Canvas(self.window, bg=self.bg_color, highlightthickness=0)
         self.canvas.place(x=0, y=0, relwidth=1, relheight=1)
-        title_font = ("Microsoft JhengHei", 36)
-        sw = self.window.winfo_screenwidth()
-        sh = self.window.winfo_screenheight()
-        self.txt_shadow = self.canvas.create_text(
-            sw//2 + 2, sh//2 + 2,
-            text="", font=title_font, fill="#c8e6c9", justify=tk.CENTER
-        )
-        self.txt_main = self.canvas.create_text(
-            sw//2, sh//2,
-            text="", font=title_font, fill="#2c3e50", justify=tk.CENTER
-        )
-        self.close_id = self.canvas.create_text(
-            sw - 50, 40, text="✕", font=("Segoe UI", 22), fill="#b0bec5"
-        )
-        self.canvas.tag_bind(self.close_id, "<ButtonRelease-1>", lambda e: self.finish_early())
-        self.canvas.tag_bind(self.close_id, "<Enter>", lambda e: self.canvas.itemconfig(self.close_id, fill="#2c3e50"))
-        self.canvas.tag_bind(self.close_id, "<Leave>", lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"))
         self.leaves = []
         self.animating = False
         self.start_time = 0
@@ -355,62 +338,83 @@ class EyesProtectorController:
         self.target_interval = BREAK_INTERVAL
         self.state = "RUNNING"
         self.running = True
+        self.lock = threading.Lock()
         self.timer_thread = threading.Thread(target=self.run_timer, daemon=True)
         self.timer_thread.start()
     def toggle_pause(self):
-        self.paused = not self.paused
-        if not self.paused:
-            self.time_elapsed = 0
+        with self.lock:
+            self.paused = not self.paused
+            if not self.paused:
+                self.time_elapsed = 0
         self.floating.update_pause_ui()
     def run_timer(self):
-        while self.running:
-            time.sleep(POLL_INTERVAL)
-            if self.state != "RUNNING":
+        while True:
+            with self.lock:
+                if not self.running:
+                    break
+                current_state = self.state
+                is_floating_visible = self._floating_visible
+                is_paused = self.paused
+            
+            if current_state != "RUNNING":
+                time.sleep(POLL_INTERVAL)
                 continue
             idle_sec = get_idle_time()
             idle_threshold = 20 if "--test" in sys.argv else 300
             is_busy = is_fullscreen_or_busy() or idle_sec >= idle_threshold
-            if is_busy:
-                self.time_elapsed = 0
-                if self._floating_visible:
-                    self._floating_visible = False
-                    self.root.after(0, self.floating.hide)
-                continue
-            else:
-                if not self._floating_visible:
-                    self._floating_visible = True
-                    self.root.after(0, self.floating.show)
-            if not self.paused:
-                self.time_elapsed += POLL_INTERVAL
-                if self.time_elapsed >= self.target_interval:
-                    self.state = "DIALOG_VISIBLE"
-                    self._floating_visible = False
-                    self.root.after(0, self.floating.hide)
-                    self.root.after(0, self.dialog.show)
+            
+            with self.lock:
+                if is_busy:
+                    self.time_elapsed = 0
+                    if self._floating_visible:
+                        self._floating_visible = False
+                        self.root.after(0, self.floating.hide)
+                else:
+                    if not self._floating_visible:
+                        self._floating_visible = True
+                        self.root.after(0, self.floating.show)
+                if not self.paused:
+                    self.time_elapsed += POLL_INTERVAL
+                    if self.time_elapsed >= self.target_interval:
+                        self.state = "DIALOG_VISIBLE"
+                        self._floating_visible = False
+                        self.root.after(0, self.floating.hide)
+                        self.root.after(0, self.dialog.show)
+            time.sleep(POLL_INTERVAL)
     def snooze(self):
-        self.time_elapsed = 0
-        self.target_interval = SNOOZE_INTERVAL
-        self.state = "RUNNING"
+        with self.lock:
+            self.time_elapsed = 0
+            self.target_interval = SNOOZE_INTERVAL
+            self.state = "RUNNING"
+            if not self._floating_visible:
+                self._floating_visible = True
+                self.root.after(0, self.floating.show)
     def start_full_break(self):
-        self.state = "BREAKING"
-        self._floating_visible = False
-        self.root.after(0, self.floating.hide)
-        self.root.after(0, self.fullscreen.show)
+        with self.lock:
+            self.state = "BREAKING"
+            self._floating_visible = False
+            self.root.after(0, self.floating.hide)
+            self.root.after(0, self.fullscreen.show)
     def finish_break(self):
-        self.time_elapsed = 0
-        self.target_interval = BREAK_INTERVAL
-        self.state = "RUNNING"
+        with self.lock:
+            self.time_elapsed = 0
+            self.target_interval = BREAK_INTERVAL
+            self.state = "RUNNING"
+            if not self._floating_visible:
+                self._floating_visible = True
+                self.root.after(0, self.floating.show)
     def quit_app(self):
-        self.running = False
+        with self.lock:
+            self.running = False
         try:
             self.floating.window.destroy()
-        except: pass
+        except Exception: pass
         try:
             self.dialog.window.destroy()
-        except: pass
+        except Exception: pass
         try:
             self.fullscreen.window.destroy()
-        except: pass
+        except Exception: pass
         self.root.destroy()
         sys.exit(0)
 def check_single_instance(root):

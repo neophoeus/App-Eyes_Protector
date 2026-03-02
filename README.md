@@ -44,6 +44,13 @@ This project has been compiled into a single portable executable using PyInstall
 * **Interrupt Break**: When the full-screen leaves are falling, if you urgently need to return to work, click the `✕` symbol in the top-right corner to end the break early and return to background timing.
 * **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click `⏸` to pause the protection, or click the red `✕` on the expanded panel to safely end it.
 
+### 📝 Changelog
+
+* **v1.4**:
+  * Fixed thread-safety issues to ensure absolute stability during background timing.
+  * Resolved a bug where the floating eye window would not restore properly after finishing a break or snoozing.
+  * Optimized the rendering engine to improve performance.
+
 ### 🛠️ Development and Building
 
 If you want to modify the source code and recompile it yourself, ensure you have Python 3 installed, and run the build script in the root directory:
@@ -96,6 +103,13 @@ After the build is complete, the latest executable `EyesProtector.exe` will be g
 * **鍵盤快捷鍵支援**：當倒數視窗跳出時，可直接按下 **Enter** 鍵進入 20 秒大休息，或是按下 **Escape** 鍵將提醒延遲 5 分鐘。
 * **中斷休息**：當全螢幕樹葉飄落時，若需緊急回到工作，點擊畫面右上角的 `✕` 符號即可提早結束本次休息並退回背景計時。
 * **暫停或退出程式**：若欲暫停測量或完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，展開面板後可點擊 `⏸` 按鈕進入凍結暫停模式，或點擊紅色 `✕` 安全結束常駐。
+
+### 📝 版本紀錄
+
+* **v1.4**:
+  * 修復背景計時器的執行緒安全性（Thread Safety）問題，確保長時間常駐的絕對穩定。
+  * 修復在「結束休息」與「稍後提醒」後，懸浮保護窗有機率無法正常恢復顯示的 Bug。
+  * 移除了渲染引擎中冗餘的繪圖邏輯，進一步優化程式效能。
 
 ### 🛠️ 開發與編譯
 
