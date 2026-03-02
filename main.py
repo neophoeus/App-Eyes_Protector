@@ -231,16 +231,21 @@ class FloatingWidget:
         self.window.attributes("-alpha", 0.6)
         self.bg_color_normal = "#e8f5e9"
         self.bg_color_hover = "#ffffff"
-        self.canvas = tk.Canvas(self.window, bg="#000000", highlightthickness=0, width=130, height=44)
+        self.canvas = tk.Canvas(self.window, bg="#000000", highlightthickness=0, width=175, height=44)
         self.canvas.pack()
         self.r = 16
         self.normal_coords = (2, 2, 42, 42)
-        self.hover_coords = (2, 2, 128, 42)
+        self.hover_coords = (2, 2, 173, 42)
         points = self._get_round_rect_points(*self.normal_coords, self.r)
         self.bg_id = self.canvas.create_polygon(points, smooth=True, fill=self.bg_color_normal, outline="#a5d6a7", width=2)
         self.txt_icon = self.canvas.create_text(22, 22, text="👁️", font=("Segoe UI Emoji", 14), fill="#2c3e50")
-        self.txt_label = self.canvas.create_text(65, 22, text="", font=("Microsoft JhengHei", 10, "bold"), fill="#27ae60")
-        self.btn_close = self.canvas.create_text(110, 22, text="✕", font=("Microsoft JhengHei", 11, "bold"), fill="#e74c3c", state="hidden")
+        self.txt_label = self.canvas.create_text(60, 22, text="", font=("Microsoft JhengHei", 10, "bold"), fill="#27ae60")
+        self.btn_pause = self.canvas.create_text(115, 22, text="⏸", font=("Segoe UI Emoji", 11), fill="#f39c12", state="hidden")
+        self.btn_close = self.canvas.create_text(155, 22, text="✕", font=("Microsoft JhengHei", 11, "bold"), fill="#e74c3c", state="hidden")
+        self.canvas.tag_bind(self.btn_pause, "<Enter>", lambda e: self.canvas.itemconfig(self.btn_pause, font=("Segoe UI Emoji", 13)))
+        self.canvas.tag_bind(self.btn_pause, "<Leave>", lambda e: self.canvas.itemconfig(self.btn_pause, font=("Segoe UI Emoji", 11)))
+        self.canvas.tag_bind(self.btn_close, "<Enter>", lambda e: self.canvas.itemconfig(self.btn_close, font=("Microsoft JhengHei", 13, "bold")))
+        self.canvas.tag_bind(self.btn_close, "<Leave>", lambda e: self.canvas.itemconfig(self.btn_close, font=("Microsoft JhengHei", 11, "bold")))
         self.canvas.bind("<ButtonPress-1>", self.start_move)
         self.canvas.bind("<B1-Motion>", self.do_move)
         self.canvas.bind("<ButtonRelease-1>", self.on_click)
@@ -249,13 +254,14 @@ class FloatingWidget:
         self.window.update_idletasks()
         sw = self.window.winfo_screenwidth()
         sh = self.window.winfo_screenheight()
-        w, h = 130, 44
+        w, h = 175, 44
         x = sw - w - 40
         y = sh - h - 80
         self.window.geometry(f"{w}x{h}+{x}+{y}")
         self._x = 0
         self._y = 0
         self._dragged = False
+        self.update_pause_ui()
     def _get_round_rect_points(self, x1, y1, x2, y2, r):
         return [
             x1+r, y1,  x1+r, y1,  x2-r, y1,  x2-r, y1,
@@ -264,6 +270,17 @@ class FloatingWidget:
             x1, y2,    x1, y2-r,  x1, y2-r,  x1, y1+r,  x1, y1+r,
             x1, y1
         ]
+    def update_pause_ui(self):
+        if getattr(self.controller, 'paused', False):
+            self.canvas.itemconfig(self.txt_icon, text="😌")
+            self.canvas.itemconfig(self.btn_pause, text="▶", fill="#2ecc71")
+            if self.canvas.itemcget(self.btn_close, "state") == "normal":
+                self.canvas.itemconfig(self.txt_label, text="已暫停", fill="#f39c12")
+        else:
+            self.canvas.itemconfig(self.txt_icon, text="👁️")
+            self.canvas.itemconfig(self.btn_pause, text="⏸", fill="#f39c12")
+            if self.canvas.itemcget(self.btn_close, "state") == "normal":
+                self.canvas.itemconfig(self.txt_label, text="保護中", fill="#27ae60")
     def start_move(self, event):
         self._x = event.x
         self._y = event.y
@@ -276,16 +293,20 @@ class FloatingWidget:
         y = self.window.winfo_y() + deltay
         self.window.geometry(f"+{x}+{y}")
     def on_click(self, event):
-        if not self._dragged and event.x > 90:
+        if not self._dragged:
             if self.canvas.itemcget(self.btn_close, "state") == "normal":
-                self.controller.quit_app()
+                if 95 <= event.x <= 135:
+                    self.controller.toggle_pause()
+                elif event.x > 135:
+                    self.controller.quit_app()
     def on_hover(self, e):
         self.window.attributes("-alpha", 0.95)
         new_points = self._get_round_rect_points(*self.hover_coords, self.r)
         self.canvas.coords(self.bg_id, *new_points)
         self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline="#81c784")
-        self.canvas.itemconfig(self.txt_label, text="保護中")
+        self.canvas.itemconfig(self.btn_pause, state="normal")
         self.canvas.itemconfig(self.btn_close, state="normal")
+        self.update_pause_ui()
         self.window.config(cursor="hand2")
     def on_leave(self, e):
         x, y = self.window.winfo_pointerxy()
@@ -299,7 +320,9 @@ class FloatingWidget:
             self.canvas.coords(self.bg_id, *old_points)
             self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
             self.canvas.itemconfig(self.txt_label, text="")
+            self.canvas.itemconfig(self.btn_pause, state="hidden")
             self.canvas.itemconfig(self.btn_close, state="hidden")
+            self.update_pause_ui()
             self.window.config(cursor="arrow")
     def hide(self):
         if self.window.state() != "withdrawn":
@@ -313,6 +336,7 @@ class EyesProtectorController:
         self.root.withdraw()
         self.dialog = CenterReminderDialog(self)
         self.fullscreen = FullScreenBreak(self)
+        self.paused = False
         self.floating = FloatingWidget(self)
         self.root.after(100, self.floating.show)
         self.time_elapsed = 0
@@ -321,6 +345,11 @@ class EyesProtectorController:
         self.running = True
         self.timer_thread = threading.Thread(target=self.run_timer, daemon=True)
         self.timer_thread.start()
+    def toggle_pause(self):
+        self.paused = not self.paused
+        if not self.paused:
+            self.time_elapsed = 0
+        self.floating.update_pause_ui()
     def run_timer(self):
         while self.running:
             time.sleep(POLL_INTERVAL)
@@ -328,17 +357,19 @@ class EyesProtectorController:
                 continue
             idle_sec = get_idle_time()
             idle_threshold = 20 if "--test" in sys.argv else 300
-            if is_fullscreen_or_busy() or idle_sec >= idle_threshold:
+            is_busy = is_fullscreen_or_busy() or idle_sec >= idle_threshold
+            if is_busy:
                 self.time_elapsed = 0
                 self.root.after(0, self.floating.hide)
                 continue
             else:
                 self.root.after(0, self.floating.show)
-            self.time_elapsed += POLL_INTERVAL
-            if self.time_elapsed >= self.target_interval:
-                self.state = "DIALOG_VISIBLE"
-                self.root.after(0, self.floating.hide)
-                self.root.after(0, self.dialog.show)
+            if not self.paused:
+                self.time_elapsed += POLL_INTERVAL
+                if self.time_elapsed >= self.target_interval:
+                    self.state = "DIALOG_VISIBLE"
+                    self.root.after(0, self.floating.hide)
+                    self.root.after(0, self.dialog.show)
     def snooze(self):
         self.time_elapsed = 0
         self.target_interval = SNOOZE_INTERVAL
