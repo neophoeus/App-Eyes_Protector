@@ -21,9 +21,10 @@ A highly lightweight, zero-dependency, immersive eye protection assistant for Wi
 
 ### ⚙️ Technical Principles
 
-* **Environment Detection**: Intelligently determines whether the user is in full-screen gaming, watching a video, or sleeping mode by directly calling the Windows underlying native API (`ctypes.windll.shell32.SHQueryUserNotificationState`) to avoid any disruption.
+* **Environment Detection & Power Friendly**: Intelligently determines whether the user is in full-screen gaming, watching a video by calling Windows native API (`SHQueryUserNotificationState`) and monitoring hardware inputs (`GetLastInputInfo`). It guarantees absolute zero-interference during breaks. Moreover, it boasts an ultra-optimized event loop that **will not prevent Windows from automatically turning off the display or entering sleep mode**.
+* **Smart Pause**: Need absolute focus? Just unfold the widget and click the pause (`⏸`) button. The eye protector icon will turn into a relaxed face (`😌`), and the timer will freeze. Resuming the timer will automatically start counting from zero, keeping the flow going naturally.
 * **Rendering Engine**: Zero image file dependencies, entirely built using the Python `tkinter.Canvas` native drawing tool. It combines mathematical geometry (trigonometric functions and random variables) to construct falling leaf polygons and features a pure-code-rendered high-quality transparent floating UI.
-* **Ultra-Lightweight Deployment**: Discards all external third-party packages (such as Pillow, Pystray) and uses PyInstaller to package into a single background executable (`EyesProtector.exe`), paired with BAT batch scripts for easy auto-startup on boot and uninstallation.
+* **Ultra-Lightweight Deployment**: Discards all external third-party packages and uses PyInstaller to package into a single background executable (`EyesProtector.exe`), paired with BAT batch scripts for easy auto-startup on boot and uninstallation.
 
 ### 🚀 Quick Start
 
@@ -39,8 +40,9 @@ This project has been compiled into a single portable executable using PyInstall
 #### Manual Testing and Operation
 
 * **Test Animation Effects**: You can run `EyesProtector.exe --test` from the terminal to immediately test the 10-second reminder and 5-second break.
+* **Keyboard Shortcuts**: When the popup appears, press **Enter** to instantly start the 20-second break, or press **Escape** to snooze for 5 minutes.
 * **Interrupt Break**: When the full-screen leaves are falling, if you urgently need to return to work, click the `✕` symbol in the top-right corner to end the break early and return to background timing.
-* **Exit Program**: To completely close the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner and click the red `✕` on the expanded panel to safely end it.
+* **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click `⏸` to pause the protection, or click the red `✕` on the expanded panel to safely end it.
 
 ### 🛠️ Development and Building
 
@@ -72,9 +74,10 @@ After the build is complete, the latest executable `EyesProtector.exe` will be g
 
 ### ⚙️ 技術原理
 
-* **環境偵測**：透過直接呼叫 Windows 底層原生 API (`ctypes.windll.shell32.SHQueryUserNotificationState`)，智慧判斷使用者是否處於全螢幕遊戲、看影片或休眠狀態，避免干擾。
+* **環境與電源偵測**：透過呼叫 Windows 底層原生 API (`SHQueryUserNotificationState`) 與硬體事件 (`GetLastInputInfo`)，智慧判斷使用者是否看影片、玩遊戲或離開座位，避免打擾。更具備極度優化的事件迴圈，**絕不會阻擋 Windows 系統自動關閉螢幕或進入休眠狀態**。
+* **貼心暫停模式**：需要絕對專注？將滑鼠移至懸浮窗並點擊暫停 (`⏸`) 按鈕。護眼圖示將轉為閉眼放鬆表情 (`😌`)，且計時器完全凍結；當再次恢復防護時會自動「從零開始重新計時」，給予最無壓力的轉場體驗。
 * **渲染引擎**：零圖檔依賴，完全使用 Python `tkinter.Canvas` 原生繪圖工具。結合數學幾何（三角函數與隨機變數）建構落葉多邊形，並具備純代碼渲染的高質感去背懸浮 UI。
-* **極輕量部署**：捨棄所有外部第三方套件（如 Pillow、Pystray），並透過 PyInstaller 打包為單一背景執行檔 (`EyesProtector.exe`)，搭配 BAT 批次腳本達成簡易的開機自動啟動與卸載。
+* **極輕量部署**：捨棄所有外部第三方套件，並透過 PyInstaller 打包為單一背景執行檔 (`EyesProtector.exe`)，搭配 BAT 批次腳本達成簡易的開機自動啟動與卸載。
 
 ### 🚀 快速上手
 
@@ -90,8 +93,9 @@ After the build is complete, the latest executable `EyesProtector.exe` will be g
 #### 手動測試與操作
 
 * **測試動畫效果**：您可以從終端機執行 `EyesProtector.exe --test` 來立即測試 10 秒提醒與 5 秒休息。
+* **鍵盤快捷鍵支援**：當倒數視窗跳出時，可直接按下 **Enter** 鍵進入 20 秒大休息，或是按下 **Escape** 鍵將提醒延遲 5 分鐘。
 * **中斷休息**：當全螢幕樹葉飄落時，若需緊急回到工作，點擊畫面右上角的 `✕` 符號即可提早結束本次休息並退回背景計時。
-* **退出程式**：若欲完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，點擊展開面板上的紅色 `✕` 即可安全結束常駐。
+* **暫停或退出程式**：若欲暫停測量或完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，展開面板後可點擊 `⏸` 按鈕進入凍結暫停模式，或點擊紅色 `✕` 安全結束常駐。
 
 ### 🛠️ 開發與編譯
 
