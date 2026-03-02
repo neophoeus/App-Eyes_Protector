@@ -238,7 +238,6 @@ class FloatingWidget:
         self.hover_coords = (2, 2, 173, 42)
         points = self._get_round_rect_points(*self.normal_coords, self.r)
         self.bg_id = self.canvas.create_polygon(points, smooth=True, fill=self.bg_color_normal, outline="#a5d6a7", width=2)
-        self.txt_icon = self.canvas.create_text(22, 22, text="👁️", font=("Segoe UI Emoji", 14), fill="#2c3e50")
         self.txt_label = self.canvas.create_text(60, 22, text="", font=("Microsoft JhengHei", 10, "bold"), fill="#27ae60")
         self.btn_pause = self.canvas.create_text(115, 22, text="⏸", font=("Segoe UI Emoji", 11), fill="#f39c12", state="hidden")
         self.btn_close = self.canvas.create_text(155, 22, text="✕", font=("Microsoft JhengHei", 11, "bold"), fill="#e74c3c", state="hidden")
@@ -270,14 +269,26 @@ class FloatingWidget:
             x1, y2,    x1, y2-r,  x1, y2-r,  x1, y1+r,  x1, y1+r,
             x1, y1
         ]
+    def _draw_eye(self, state):
+        self.canvas.delete("icon_parts")
+        if state == "open":
+            self.canvas.create_line(8, 22, 22, 10, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
+            self.canvas.create_line(8, 22, 22, 34, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
+            self.canvas.create_oval(19, 19, 25, 25, fill="#2c3e50", outline="", tags="icon_parts")
+        elif state == "closed":
+            self.canvas.create_line(8, 19, 22, 29, 36, 19, smooth=True, fill="#f39c12", width=2, tags="icon_parts")
+            self.canvas.create_line(22, 25, 22, 30, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(15, 23, 12, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(29, 23, 32, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+
     def update_pause_ui(self):
         if getattr(self.controller, 'paused', False):
-            self.canvas.itemconfig(self.txt_icon, text="😌")
+            self._draw_eye("closed")
             self.canvas.itemconfig(self.btn_pause, text="▶", fill="#2ecc71")
             if self.canvas.itemcget(self.btn_close, "state") == "normal":
                 self.canvas.itemconfig(self.txt_label, text="已暫停", fill="#f39c12")
         else:
-            self.canvas.itemconfig(self.txt_icon, text="👁️")
+            self._draw_eye("open")
             self.canvas.itemconfig(self.btn_pause, text="⏸", fill="#f39c12")
             if self.canvas.itemcget(self.btn_close, "state") == "normal":
                 self.canvas.itemconfig(self.txt_label, text="保護中", fill="#27ae60")
@@ -373,6 +384,7 @@ class EyesProtectorController:
                 self.time_elapsed += POLL_INTERVAL
                 if self.time_elapsed >= self.target_interval:
                     self.state = "DIALOG_VISIBLE"
+                    self._floating_visible = False
                     self.root.after(0, self.floating.hide)
                     self.root.after(0, self.dialog.show)
     def snooze(self):
@@ -381,6 +393,7 @@ class EyesProtectorController:
         self.state = "RUNNING"
     def start_full_break(self):
         self.state = "BREAKING"
+        self._floating_visible = False
         self.root.after(0, self.floating.hide)
         self.root.after(0, self.fullscreen.show)
     def finish_break(self):
