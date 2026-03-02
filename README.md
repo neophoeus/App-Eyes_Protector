@@ -22,8 +22,8 @@ A highly lightweight, zero-dependency, immersive eye protection assistant for Wi
 ### ⚙️ Technical Principles
 
 * **Environment Detection & Power Friendly**: Intelligently determines whether the user is in full-screen gaming, watching a video by calling Windows native API (`SHQueryUserNotificationState`) and monitoring hardware inputs (`GetLastInputInfo`). It guarantees absolute zero-interference during breaks. Moreover, it boasts an ultra-optimized event loop that **will not prevent Windows from automatically turning off the display or entering sleep mode**.
-* **Smart Pause**: Need absolute focus? Just unfold the widget and click the pause (`⏸`) button. The eye protector icon will turn into a relaxed face (`😌`), and the timer will freeze. Resuming the timer will automatically start counting from zero, keeping the flow going naturally.
-* **Rendering Engine**: Zero image file dependencies, entirely built using the Python `tkinter.Canvas` native drawing tool. It combines mathematical geometry (trigonometric functions and random variables) to construct falling leaf polygons and features a pure-code-rendered high-quality transparent floating UI.
+* **Smart Pause**: Need absolute focus? Just unfold the widget and click the pause (`⏸`) button. The eye protector icon will smoothly transition into a newly designed, canvas-drawn "closed eye" indicator, and the timer will freeze. Resuming the timer will automatically start counting from zero, keeping the flow going naturally.
+* **Rendering Engine**: Zero image file dependencies, entirely built using the Python `tkinter.Canvas` native drawing tool. It combines mathematical geometry (trigonometric functions and random variables) to construct falling leaf polygons and features a pure-code-rendered high-quality transparent floating UI with custom-drawn eye icons.
 * **Ultra-Lightweight Deployment**: Discards all external third-party packages and uses PyInstaller to package into a single background executable (`EyesProtector.exe`), paired with BAT batch scripts for easy auto-startup on boot and uninstallation.
 
 ### 🚀 Quick Start
@@ -75,8 +75,8 @@ After the build is complete, the latest executable `EyesProtector.exe` will be g
 ### ⚙️ 技術原理
 
 * **環境與電源偵測**：透過呼叫 Windows 底層原生 API (`SHQueryUserNotificationState`) 與硬體事件 (`GetLastInputInfo`)，智慧判斷使用者是否看影片、玩遊戲或離開座位，避免打擾。更具備極度優化的事件迴圈，**絕不會阻擋 Windows 系統自動關閉螢幕或進入休眠狀態**。
-* **貼心暫停模式**：需要絕對專注？將滑鼠移至懸浮窗並點擊暫停 (`⏸`) 按鈕。護眼圖示將轉為閉眼放鬆表情 (`😌`)，且計時器完全凍結；當再次恢復防護時會自動「從零開始重新計時」，給予最無壓力的轉場體驗。
-* **渲染引擎**：零圖檔依賴，完全使用 Python `tkinter.Canvas` 原生繪圖工具。結合數學幾何（三角函數與隨機變數）建構落葉多邊形，並具備純代碼渲染的高質感去背懸浮 UI。
+* **貼心暫停模式**：需要絕對專注？將滑鼠移至懸浮窗並點擊暫停 (`⏸`) 按鈕。護眼圖示將平滑切換為高質感的「閉眼休息」專屬繪製圖示，且計時器完全凍結；當再次恢復防護時會自動「從零開始重新計時」，給予最無壓力的轉場體驗。
+* **渲染引擎**：零圖檔依賴，完全使用 Python `tkinter.Canvas` 原生繪圖工具。結合數學幾何（三角函數與隨機變數）建構落葉多邊形，並具備純代碼渲染的高質感去背懸浮 UI 與專屬繪製的狀態圖示。
 * **極輕量部署**：捨棄所有外部第三方套件，並透過 PyInstaller 打包為單一背景執行檔 (`EyesProtector.exe`)，搭配 BAT 批次腳本達成簡易的開機自動啟動與卸載。
 
 ### 🚀 快速上手
