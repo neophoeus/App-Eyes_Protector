@@ -338,6 +338,7 @@ class EyesProtectorController:
         self.fullscreen = FullScreenBreak(self)
         self.paused = False
         self.floating = FloatingWidget(self)
+        self._floating_visible = True
         self.root.after(100, self.floating.show)
         self.time_elapsed = 0
         self.target_interval = BREAK_INTERVAL
@@ -360,10 +361,14 @@ class EyesProtectorController:
             is_busy = is_fullscreen_or_busy() or idle_sec >= idle_threshold
             if is_busy:
                 self.time_elapsed = 0
-                self.root.after(0, self.floating.hide)
+                if self._floating_visible:
+                    self._floating_visible = False
+                    self.root.after(0, self.floating.hide)
                 continue
             else:
-                self.root.after(0, self.floating.show)
+                if not self._floating_visible:
+                    self._floating_visible = True
+                    self.root.after(0, self.floating.show)
             if not self.paused:
                 self.time_elapsed += POLL_INTERVAL
                 if self.time_elapsed >= self.target_interval:
