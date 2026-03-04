@@ -191,6 +191,13 @@ class FullScreenBreak:
         self.canvas.tag_raise(self.txt_msg)
         self.canvas.tag_raise(self.txt_timer)
         self.canvas.tag_raise(self.close_id)
+    def _animation_loop(self):
+        if not self.animating:
+            return
+        current_time = time.time() - self.start_time
+        for leaf in self.leaves:
+            leaf.update(current_time * 15)
+        self.window.after(66, self._animation_loop)
     def show(self):
         self.window.update_idletasks()
         self.init_geometry()
