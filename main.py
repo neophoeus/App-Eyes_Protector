@@ -147,13 +147,35 @@ class FullScreenBreak:
         self.canvas.delete("all")
         sw = self.window.winfo_screenwidth()
         sh = self.window.winfo_screenheight()
-        title_font = ("Microsoft JhengHei", 36)
-        self.txt_shadow = self.canvas.create_text(
-            sw//2 + 2, sh//2 + 2, text="", font=title_font, fill="#c8e6c9", justify=tk.CENTER
+        title_font = ("Microsoft JhengHei", 42, "bold")
+        desc_font = ("Microsoft JhengHei", 18)
+        sub_font = ("Microsoft JhengHei", 24, "bold")
+        timer_font = ("Consolas", 80, "bold")
+        
+        self.txt_title_shadow = self.canvas.create_text(
+            sw//2 + 3, sh//2 - 130 + 3, text="🌿 20-20-20 護眼法則", font=title_font, fill="#c8e6c9", justify=tk.CENTER
         )
-        self.txt_main = self.canvas.create_text(
-            sw//2, sh//2, text="", font=title_font, fill="#2c3e50", justify=tk.CENTER
+        self.txt_title = self.canvas.create_text(
+            sw//2, sh//2 - 130, text="🌿 20-20-20 護眼法則", font=title_font, fill="#2c3e50", justify=tk.CENTER
         )
+        
+        desc_text = "由美國眼科醫學會（AAO）與專業醫師廣泛推廣的黃金護眼指南：\n「每使用螢幕 20 分鐘，就把視線移開看 20 呎（約 6 公尺）遠的物體，持續 20 秒鐘。」"
+        self.txt_desc_shadow = self.canvas.create_text(
+            sw//2 + 2, sh//2 - 30 + 2, text=desc_text, font=desc_font, fill="#c8e6c9", justify=tk.CENTER
+        )
+        self.txt_desc = self.canvas.create_text(
+            sw//2, sh//2 - 30, text=desc_text, font=desc_font, fill="#34495e", justify=tk.CENTER,
+            width=sw*0.8
+        )
+        
+        self.txt_msg = self.canvas.create_text(
+            sw//2, sh//2 + 60, text="放鬆你的雙眼，看向遠方...", font=sub_font, fill="#27ae60", justify=tk.CENTER
+        )
+        
+        self.txt_timer = self.canvas.create_text(
+            sw//2, sh//2 + 180, text="", font=timer_font, fill="#2c3e50", justify=tk.CENTER
+        )
+
         self.close_id = self.canvas.create_text(
             sw - 50, 40, text="✕", font=("Segoe UI", 22), fill="#b0bec5"
         )
@@ -161,19 +183,14 @@ class FullScreenBreak:
         self.canvas.tag_bind(self.close_id, "<Enter>", lambda e: self.canvas.itemconfig(self.close_id, fill="#2c3e50"))
         self.canvas.tag_bind(self.close_id, "<Leave>", lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"))
         self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(15)]
-        self.canvas.tag_raise(self.txt_shadow)
-        self.canvas.tag_raise(self.txt_main)
+        
+        self.canvas.tag_raise(self.txt_title_shadow)
+        self.canvas.tag_raise(self.txt_title)
+        self.canvas.tag_raise(self.txt_desc_shadow)
+        self.canvas.tag_raise(self.txt_desc)
+        self.canvas.tag_raise(self.txt_msg)
+        self.canvas.tag_raise(self.txt_timer)
         self.canvas.tag_raise(self.close_id)
-    def _update_text(self, text):
-        self.canvas.itemconfig(self.txt_shadow, text=text)
-        self.canvas.itemconfig(self.txt_main, text=text)
-    def _animation_loop(self):
-        if not self.animating:
-            return
-        current_time = time.time() - self.start_time
-        for leaf in self.leaves:
-            leaf.update(current_time * 15)
-        self.window.after(66, self._animation_loop)
     def show(self):
         self.window.update_idletasks()
         self.init_geometry()
@@ -182,7 +199,6 @@ class FullScreenBreak:
         self.window.deiconify()
         self.window.focus_force()
         self.window.attributes("-topmost", True)
-        self._update_text("🌿 20-20-20 護眼時刻\n\n看向 20 呎遠的地方，放鬆你的雙眼...")
         self._animation_loop()
         self._countdown_step(BREAK_DURATION)
     def hide(self):
@@ -190,15 +206,25 @@ class FullScreenBreak:
         self.window.withdraw()
     def _countdown_step(self, remaining):
         if remaining > 0:
-            self._update_text(f"🌿 20-20-20 護眼時刻\n\n看向 20 呎遠的地方，放鬆你的雙眼...\n\n剩 餘 {remaining} 秒")
+            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}")
             self.window.after(1000, self._countdown_step, remaining - 1)
         else:
-            self._update_text("\n\n✨ 眼睛充電完成！\n回到工作站吧！\n\n")
+            self.canvas.itemconfig(self.txt_title, text="✨ 眼睛充電完成！")
+            self.canvas.itemconfig(self.txt_title_shadow, text="✨ 眼睛充電完成！")
+            self.canvas.itemconfig(self.txt_desc, text="")
+            self.canvas.itemconfig(self.txt_desc_shadow, text="")
+            self.canvas.itemconfig(self.txt_msg, text="回到工作站吧！")
+            self.canvas.itemconfig(self.txt_timer, text="")
             winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
             self.window.after(2000, self.finish)
     def finish_early(self):
         self.animating = False
-        self._update_text("\n\n⏩ 休息中斷，回到工作站！\n\n")
+        self.canvas.itemconfig(self.txt_title, text="⏩ 休息中斷")
+        self.canvas.itemconfig(self.txt_title_shadow, text="⏩ 休息中斷")
+        self.canvas.itemconfig(self.txt_desc, text="")
+        self.canvas.itemconfig(self.txt_desc_shadow, text="")
+        self.canvas.itemconfig(self.txt_msg, text="回到工作站！")
+        self.canvas.itemconfig(self.txt_timer, text="")
         winsound.PlaySound("SystemAsterisk", winsound.SND_ALIAS | winsound.SND_ASYNC)
         self.window.after(1000, self.finish)
     def finish(self):
@@ -257,12 +283,16 @@ class FloatingWidget:
         if state == "open":
             self.canvas.create_line(8, 22, 22, 10, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
             self.canvas.create_line(8, 22, 22, 34, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
-            self.canvas.create_oval(19, 19, 25, 25, fill="#2c3e50", outline="", tags="icon_parts")
+            self.canvas.create_oval(17, 17, 27, 27, fill="#2c3e50", outline="", tags="icon_parts")
+            self.canvas.create_oval(20, 19, 23, 22, fill="#ffffff", outline="", tags="icon_parts")
+            self.canvas.create_line(22, 11, 22, 6, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(15, 13, 11, 8, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(29, 13, 33, 8, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
         elif state == "closed":
             self.canvas.create_line(8, 19, 22, 29, 36, 19, smooth=True, fill="#f39c12", width=2, tags="icon_parts")
-            self.canvas.create_line(22, 25, 22, 30, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(15, 23, 12, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(29, 23, 32, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(22, 29, 22, 35, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(15, 26, 11, 31, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(29, 26, 33, 31, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
 
     def update_pause_ui(self):
         if getattr(self.controller, 'paused', False):
