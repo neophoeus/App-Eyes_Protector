@@ -292,14 +292,18 @@ class FloatingWidget:
             self.canvas.create_line(8, 22, 22, 34, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
             self.canvas.create_oval(17, 17, 27, 27, fill="#2c3e50", outline="", tags="icon_parts")
             self.canvas.create_oval(20, 19, 23, 22, fill="#ffffff", outline="", tags="icon_parts")
-            self.canvas.create_line(22, 11, 22, 6, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(15, 13, 11, 8, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(29, 13, 33, 8, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(11, 15, 6, 12, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(15, 12, 12, 6, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(22, 10, 22, 4, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(29, 12, 32, 6, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(33, 15, 38, 12, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
         elif state == "closed":
             self.canvas.create_line(8, 19, 22, 29, 36, 19, smooth=True, fill="#f39c12", width=2, tags="icon_parts")
-            self.canvas.create_line(22, 29, 22, 35, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(15, 26, 11, 31, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
-            self.canvas.create_line(29, 26, 33, 31, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(11, 22, 6, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(15, 26, 12, 32, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(22, 29, 22, 36, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(29, 26, 32, 32, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
+            self.canvas.create_line(33, 22, 38, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
 
     def update_pause_ui(self):
         if getattr(self.controller, 'paused', False):
