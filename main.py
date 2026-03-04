@@ -292,7 +292,6 @@ class FloatingWidget:
             self.canvas.create_line(8, 22, 22, 34, 36, 22, smooth=True, fill="#2c3e50", width=2, tags="icon_parts")
             self.canvas.create_oval(17, 17, 27, 27, fill="#2c3e50", outline="", tags="icon_parts")
             self.canvas.create_oval(20, 19, 23, 22, fill="#ffffff", outline="", tags="icon_parts")
-            # Open eye eyelashes (calculated to intersect the quadratic bezier curve exactly)
             self.canvas.create_line(12, 19, 9, 16, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
             self.canvas.create_line(16, 17, 14, 13, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
             self.canvas.create_line(22, 16, 22, 11, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
@@ -300,7 +299,6 @@ class FloatingWidget:
             self.canvas.create_line(32, 19, 35, 16, fill="#2c3e50", width=2, capstyle=tk.ROUND, tags="icon_parts")
         elif state == "closed":
             self.canvas.create_line(8, 19, 22, 29, 36, 19, smooth=True, fill="#f39c12", width=2, tags="icon_parts")
-            # Closed eye eyelashes (calculated to intersect the quadratic bezier curve exactly at y(t) = 19 + 20t - 20t^2)
             self.canvas.create_line(12, 21, 9, 24, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
             self.canvas.create_line(16, 23, 14, 27, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
             self.canvas.create_line(22, 24, 22, 29, fill="#f39c12", width=2, capstyle=tk.ROUND, tags="icon_parts")
