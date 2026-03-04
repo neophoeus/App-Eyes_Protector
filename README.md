@@ -42,6 +42,9 @@ This project has been compiled into a single portable executable using PyInstall
 * **Test Animation Effects**: You can run `EyesProtector.exe --test` from the terminal to immediately test the 10-second reminder and 5-second break.
 * **Keyboard Shortcuts**: When the popup appears, press **Enter** to instantly start the 20-second break, or press **Escape** to snooze for 5 minutes.
 * **Interrupt Break**: When the full-screen leaves are falling, if you urgently need to return to work, click the `✕` symbol in the top-right corner to end the break early and return to background timing.
+* **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click `⏸` to pause the protection, or click the red `✕` on the expanded panel to safely end it.
+
+### 🛠️ Development and Building
 
 If you want to modify the source code and recompile it yourself, ensure you have Python 3 installed, and run the build script in the root directory:
 
@@ -92,6 +95,9 @@ After the build is complete, the latest executable `EyesProtector.exe` will be g
 * **測試動畫效果**：您可以從終端機執行 `EyesProtector.exe --test` 來立即測試 10 秒提醒與 5 秒休息。
 * **鍵盤快捷鍵支援**：當倒數視窗跳出時，可直接按下 **Enter** 鍵進入 20 秒大休息，或是按下 **Escape** 鍵將提醒延遲 5 分鐘。
 * **中斷休息**：當全螢幕樹葉飄落時，若需緊急回到工作，點擊畫面右上角的 `✕` 符號即可提早結束本次休息並退回背景計時。
+* **暫停或退出程式**：若欲暫停測量或完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，展開面板後可點擊 `⏸` 按鈕進入凍結暫停模式，或點擊紅色 `✕` 安全結束常駐。
+
+### 🛠️ 開發與編譯
 
 如果您想自行修改原始碼並重新編譯，請確認您已安裝 Python 3，並執行根目錄下的打包腳本：
 
