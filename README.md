@@ -53,7 +53,26 @@ pip install pyinstaller
 .\build.bat
 ```
 
+If the build fails while replacing `dist\EyesProtector.exe`, close any running `EyesProtector.exe` process first and rerun the script.
+
 After the build is complete, the latest executable `EyesProtector.exe` will be generated in the `dist` directory.
+
+#### Run Automated Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+#### Manual Verification Checklist
+
+1. Run `EyesProtector.exe --test` and confirm the floating widget appears near the bottom-right corner.
+2. Hover the widget and verify the pause and close controls expand correctly.
+3. Click pause, wait 10 seconds, and confirm no reminder dialog appears while paused.
+4. Resume and confirm the reminder countdown restarts from zero instead of resuming the old elapsed time.
+5. When the reminder dialog appears, press `Esc` and confirm the next reminder is delayed by about 5 seconds in test mode.
+6. Trigger the reminder again, press `Enter`, and confirm the full-screen break opens and counts down.
+7. During the break, click the top-right `✕` and confirm the break ends immediately without delayed follow-up callbacks.
+8. Relaunch the app while it is already running and confirm the single-instance prompt appears.
 
 ---
 
@@ -106,4 +125,23 @@ pip install pyinstaller
 .\build.bat
 ```
 
+若打包時無法覆寫 `dist\EyesProtector.exe`，請先關閉正在執行的 `EyesProtector.exe` 後再重新執行。
+
 編譯完成後，最新的執行檔 `EyesProtector.exe` 將會產生在 `dist` 目錄下。
+
+#### 執行自動化測試
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+#### 手動驗證清單
+
+1. 執行 `EyesProtector.exe --test`，確認右下角出現懸浮窗。
+2. 滑鼠移入懸浮窗，確認暫停與關閉按鈕會正確展開。
+3. 點擊暫停後等待 10 秒，確認暫停期間不會跳出提醒視窗。
+4. 重新恢復後，確認提醒倒數會從零重新開始，而不是沿用先前進度。
+5. 當提醒視窗出現時按下 `Esc`，確認 test 模式下約 5 秒後才再次提醒。
+6. 再次觸發提醒後按下 `Enter`，確認全螢幕休息視窗正常顯示並倒數。
+7. 在休息視窗中點擊右上角 `✕`，確認可以立即結束，且不會殘留延遲 callback。
+8. 在程式已執行時再次啟動，確認單實例提示視窗正常出現。
