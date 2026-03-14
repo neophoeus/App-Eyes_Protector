@@ -14,7 +14,8 @@ env.bak/
 venv.bak/
 
 # 開發工具
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 .spyderproject
 .ropeproject

@@ -9,8 +9,8 @@ if exist "%VENV_PYTHON%" (
 )
 
 echo Using Python: %PYTHON_CMD%
-echo Installing/Updating pyinstaller...
-"%PYTHON_CMD%" -m pip install pyinstaller
+echo Installing/Updating development dependencies...
+"%PYTHON_CMD%" -m pip install -r "%~dp0requirements-dev.txt"
 
 echo Start packing main.py...
 :: --noconsole: Do not display a console window behind the application
