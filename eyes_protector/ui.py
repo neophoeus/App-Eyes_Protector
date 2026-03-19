@@ -6,12 +6,18 @@ import tkinter as tk
 from .platform_utils import safe_play_sound
 
 
+BREAK_ANIMATION_INTERVAL_MS = 125
+BREAK_ANIMATION_TIME_SCALE = 12
+BREAK_LEAF_COUNT = 6
+BREAK_LEAF_SIZE_SCALE = 1.15
+
+
 class Leaf:
     def __init__(self, canvas, sw, sh):
         self.canvas = canvas
         self.sw = sw
         self.sh = sh
-        self.size = random.uniform(sh * 0.03, sh * 0.08)
+        self.size = random.uniform(sh * 0.03, sh * 0.08) * BREAK_LEAF_SIZE_SCALE
         self.x = random.uniform(0, sw)
         self.y = random.uniform(-self.size * 3, sh)
         self.fall_speed = random.uniform(0.5, 2.5)
@@ -28,7 +34,7 @@ class Leaf:
 
     def _get_leaf_points(self, cx, cy, angle, scale, squeeze):
         points = []
-        resolution = 6
+        resolution = 4
         for i in range(resolution):
             t = (i / resolution) * math.pi * 2
             px = math.sin(t) * (scale * 0.3)
@@ -167,55 +173,58 @@ class FullScreenBreak:
         self.canvas.delete("all")
         sw = self.window.winfo_screenwidth()
         sh = self.window.winfo_screenheight()
-        title_font = ("Microsoft JhengHei", 42, "bold")
-        desc_font = ("Microsoft JhengHei", 18)
-        sub_font = ("Microsoft JhengHei", 24, "bold")
-        timer_font = ("Consolas", 80, "bold")
+        left_center_x = int(sw * 0.33)
+        right_center_x = int(sw * 0.72)
+        center_y = sh // 2
+        guide_font = ("Microsoft JhengHei UI", 34, "bold")
+        timer_font = ("Segoe UI", 150, "bold")
+        status_font = ("Microsoft JhengHei UI", 26, "bold")
+        guide_text = "20－每20分鐘\n20－花20秒鐘\n20－看20呎外（6公尺外）"
         self.txt_title_shadow = self.canvas.create_text(
-            sw // 2 + 3,
-            sh // 2 - 130 + 3,
-            text="🌿 20-20-20 護眼法則",
-            font=title_font,
+            left_center_x + 3,
+            center_y + 3,
+            text=guide_text,
+            font=guide_font,
             fill="#c8e6c9",
-            justify=tk.CENTER,
+            justify=tk.LEFT,
+            anchor="w",
         )
         self.txt_title = self.canvas.create_text(
-            sw // 2,
-            sh // 2 - 130,
-            text="🌿 20-20-20 護眼法則",
-            font=title_font,
+            left_center_x,
+            center_y,
+            text=guide_text,
+            font=guide_font,
             fill="#2c3e50",
-            justify=tk.CENTER,
+            justify=tk.LEFT,
+            anchor="w",
         )
-        desc_text = "由美國眼科醫學會（AAO）與專業醫師廣泛推廣的黃金護眼指南：\n「每使用螢幕 20 分鐘，就把視線移開看 20 呎（約 6 公尺）遠的物體，持續 20 秒鐘。」"
         self.txt_desc_shadow = self.canvas.create_text(
-            sw // 2 + 2,
-            sh // 2 - 30 + 2,
-            text=desc_text,
-            font=desc_font,
+            right_center_x + 2,
+            center_y + 2,
+            text="",
+            font=status_font,
             fill="#c8e6c9",
             justify=tk.CENTER,
         )
         self.txt_desc = self.canvas.create_text(
-            sw // 2,
-            sh // 2 - 30,
-            text=desc_text,
-            font=desc_font,
+            right_center_x,
+            center_y,
+            text="",
+            font=status_font,
             fill="#34495e",
             justify=tk.CENTER,
-            width=sw * 0.8,
         )
         self.txt_msg = self.canvas.create_text(
-            sw // 2,
-            sh // 2 + 60,
-            text="放鬆你的雙眼，看向遠方...",
-            font=sub_font,
+            right_center_x,
+            center_y - 120,
+            text="LOOK AWAY",
+            font=("Segoe UI Semibold", 26, "bold"),
             fill="#27ae60",
             justify=tk.CENTER,
         )
         self.txt_timer = self.canvas.create_text(
-            sw // 2,
-            sh // 2 + 180,
+            right_center_x,
+            center_y + 20,
             text="",
             font=timer_font,
             fill="#2c3e50",
@@ -241,7 +250,7 @@ class FullScreenBreak:
             "<Leave>",
             lambda e: self.canvas.itemconfig(self.close_id, fill="#b0bec5"),
         )
-        self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(15)]
+        self.leaves = [Leaf(self.canvas, sw, sh) for _ in range(BREAK_LEAF_COUNT)]
         self.canvas.tag_raise(self.txt_title_shadow)
         self.canvas.tag_raise(self.txt_title)
         self.canvas.tag_raise(self.txt_desc_shadow)
@@ -266,8 +275,12 @@ class FullScreenBreak:
             return
         current_time = time.time() - self.start_time
         for leaf in self.leaves:
-            leaf.update(current_time * 15)
-        self._animation_job = self.window.after(66, self._animation_loop, session_id)
+            leaf.update(current_time * BREAK_ANIMATION_TIME_SCALE)
+        self._animation_job = self.window.after(
+            BREAK_ANIMATION_INTERVAL_MS,
+            self._animation_loop,
+            session_id,
+        )
 
     def show(self):
         self.hide()
@@ -301,9 +314,9 @@ class FullScreenBreak:
         self._countdown_job = None
         self.canvas.itemconfig(self.txt_title, text="✨ 眼睛充電完成！")
         self.canvas.itemconfig(self.txt_title_shadow, text="✨ 眼睛充電完成！")
-        self.canvas.itemconfig(self.txt_desc, text="")
-        self.canvas.itemconfig(self.txt_desc_shadow, text="")
-        self.canvas.itemconfig(self.txt_msg, text="回到工作站吧！")
+        self.canvas.itemconfig(self.txt_desc, text="回到工作站吧！")
+        self.canvas.itemconfig(self.txt_desc_shadow, text="回到工作站吧！")
+        self.canvas.itemconfig(self.txt_msg, text="READY")
         self.canvas.itemconfig(self.txt_timer, text="")
         safe_play_sound("SystemAsterisk")
         self._finish_job = self.window.after(2000, self.finish)
@@ -315,9 +328,9 @@ class FullScreenBreak:
         self._cancel_jobs()
         self.canvas.itemconfig(self.txt_title, text="⏩ 休息中斷")
         self.canvas.itemconfig(self.txt_title_shadow, text="⏩ 休息中斷")
-        self.canvas.itemconfig(self.txt_desc, text="")
-        self.canvas.itemconfig(self.txt_desc_shadow, text="")
-        self.canvas.itemconfig(self.txt_msg, text="回到工作站！")
+        self.canvas.itemconfig(self.txt_desc, text="回到工作站！")
+        self.canvas.itemconfig(self.txt_desc_shadow, text="回到工作站！")
+        self.canvas.itemconfig(self.txt_msg, text="SKIPPED")
         self.canvas.itemconfig(self.txt_timer, text="")
         safe_play_sound("SystemAsterisk")
         self._finish_job = self.window.after(1000, self.finish)

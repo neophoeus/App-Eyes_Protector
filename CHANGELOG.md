@@ -2,6 +2,26 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v1.8 - 2026-03-19
+
+### Added
+
+- Busy-reason handling now distinguishes between idle absence and full-screen focus, allowing the reminder timer to apply different pause behavior depending on the situation.
+- Full-screen transition debounce was added so reminder timing does not jitter when videos, presentations, or full-screen apps enter and leave focus.
+- Core, controller, config, and platform utility tests were expanded to cover busy-reason classification and the new debounce flow.
+
+### Changed
+
+- Idle inactivity now resets elapsed reminder time, while full-screen playback or presentation mode freezes the elapsed time instead of clearing it.
+- The full-screen break page now uses a cleaner two-column layout, with the 20-20-20 rule on the left and a large countdown display on the right.
+- Break animation resource usage was reduced by simplifying leaf geometry, lowering the animation rate to 8 FPS, fixing the leaf count at six, and slightly enlarging each leaf for readability.
+- README was updated to reflect the new stop-timer strategy and the simplified full-screen break experience.
+
+### Verification
+
+- Automated tests: `python -m pytest`
+- Manual smoke test: `EyesProtector.exe --test`
+
 ## v1.7 - 2026-03-18
 
 ### Added
@@ -32,6 +52,26 @@ All notable changes to App-Eyes Protector are documented here.
 # 版本紀錄
 
 App-Eyes Protector 的重要變更統一記錄於此。
+
+## v1.8 - 2026-03-19
+
+### 新增
+
+- 新增 busy 原因分類，區分「離席」與「全螢幕專注」，讓提醒倒數可依情境採用不同停表策略。
+- 新增全螢幕進出場 debounce，避免影片、簡報或全螢幕應用切換時造成計時抖動。
+- 擴充 core、controller、config 與 platform utility 測試，覆蓋 busy 原因分流與 debounce 流程。
+
+### 調整
+
+- 使用者離席時，提醒累積時間會歸零；全螢幕播放或簡報時，則改為凍結目前進度，不再直接清空。
+- 全螢幕休息頁改為更乾淨的左右雙欄版面，左側顯示 20-20-20 規則，右側以大字倒數為主視覺。
+- 休息動畫改為更省資源的設定，包含簡化葉片幾何、降為 8 FPS、固定 6 片葉子，並微幅放大葉片提升可讀性。
+- README 已同步更新新的停表策略與全螢幕休息體驗說明。
+
+### 驗證
+
+- 自動化測試：`python -m pytest`
+- 手動 smoke test：`EyesProtector.exe --test`
 
 ## v1.7 - 2026-03-18
 

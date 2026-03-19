@@ -5,6 +5,8 @@ import tkinter as tk
 from tkinter import messagebox
 import winsound
 
+from .core import BUSY_REASON_FULLSCREEN, BUSY_REASON_NONE
+
 
 class LASTINPUTINFO(ctypes.Structure):
     _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
@@ -85,9 +87,17 @@ def create_single_instance_mutex(mutex_name):
     return mutex, error_code
 
 
-def is_fullscreen_or_busy():
+def get_platform_busy_reason():
     state = _query_user_notification_state()
-    return state in (3, 4) or _foreground_window_covers_monitor()
+    if state in (3, 4):
+        return BUSY_REASON_FULLSCREEN
+    if _foreground_window_covers_monitor():
+        return BUSY_REASON_FULLSCREEN
+    return BUSY_REASON_NONE
+
+
+def is_fullscreen_or_busy():
+    return get_platform_busy_reason() != BUSY_REASON_NONE
 
 
 def get_idle_time():

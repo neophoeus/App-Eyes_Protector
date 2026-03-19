@@ -1,4 +1,7 @@
 from .core import (
+    BUSY_REASON_FULLSCREEN,
+    BUSY_REASON_IDLE,
+    BUSY_REASON_NONE,
     STATE_RUNNING,
     apply_finish_break,
     apply_quit,
@@ -8,7 +11,7 @@ from .core import (
     create_runtime_state,
     toggle_pause,
 )
-from .platform_utils import get_idle_time, is_fullscreen_or_busy, safe_destroy_window
+from .platform_utils import get_idle_time, get_platform_busy_reason, safe_destroy_window
 from .ui import CenterReminderDialog, FloatingWidget, FullScreenBreak
 
 
@@ -22,6 +25,9 @@ class EyesProtectorController:
         self.fullscreen = FullScreenBreak(self)
         self.floating = FloatingWidget(self)
         self._tick_job = None
+        self._effective_busy_reason = BUSY_REASON_NONE
+        self._fullscreen_busy_streak = 0
+        self._fullscreen_clear_streak = 0
         self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule(100)
 
@@ -67,6 +73,40 @@ class EyesProtectorController:
         else:
             self.floating.hide()
 
+    def _resolve_busy_reason(self, raw_busy_reason):
+        if raw_busy_reason == BUSY_REASON_IDLE:
+            self._effective_busy_reason = BUSY_REASON_IDLE
+            self._fullscreen_busy_streak = 0
+            self._fullscreen_clear_streak = 0
+            return self._effective_busy_reason
+
+        if raw_busy_reason == BUSY_REASON_FULLSCREEN:
+            self._fullscreen_clear_streak = 0
+            self._fullscreen_busy_streak += 1
+            if (
+                self._effective_busy_reason == BUSY_REASON_FULLSCREEN
+                or self._fullscreen_busy_streak
+                >= self.config.fullscreen_transition_ticks
+            ):
+                self._effective_busy_reason = BUSY_REASON_FULLSCREEN
+            return self._effective_busy_reason
+
+        self._fullscreen_busy_streak = 0
+        if self._effective_busy_reason == BUSY_REASON_FULLSCREEN:
+            self._fullscreen_clear_streak += 1
+            if self._fullscreen_clear_streak < self.config.fullscreen_transition_ticks:
+                return self._effective_busy_reason
+
+        self._fullscreen_clear_streak = 0
+        self._effective_busy_reason = BUSY_REASON_NONE
+        return self._effective_busy_reason
+
+    def _detect_busy_reason(self):
+        idle_time = get_idle_time()
+        if idle_time >= self.config.idle_threshold:
+            return self._resolve_busy_reason(BUSY_REASON_IDLE)
+        return self._resolve_busy_reason(get_platform_busy_reason())
+
     def toggle_pause(self):
         self.runtime = toggle_pause(self.runtime)
         self.floating.update_pause_ui()
@@ -76,10 +116,8 @@ class EyesProtectorController:
         self._tick_job = None
         if not self.runtime.running:
             return
-        is_busy = (
-            is_fullscreen_or_busy() or get_idle_time() >= self.config.idle_threshold
-        )
-        tick_result = apply_tick(self.runtime, self.config, is_busy)
+        busy_reason = self._detect_busy_reason()
+        tick_result = apply_tick(self.runtime, self.config, busy_reason)
         previous_visibility = self.runtime.floating_visible
         self.runtime = tick_result.runtime
         if previous_visibility != self.runtime.floating_visible:

@@ -3,7 +3,12 @@ from unittest import mock
 
 from eyes_protector.config import AppConfig
 from eyes_protector.controller import EyesProtectorController
-from eyes_protector.core import STATE_DIALOG_VISIBLE, STATE_RUNNING
+from eyes_protector.core import (
+    BUSY_REASON_FULLSCREEN,
+    BUSY_REASON_NONE,
+    STATE_DIALOG_VISIBLE,
+    STATE_RUNNING,
+)
 
 
 TEST_CONFIG = AppConfig(
@@ -12,6 +17,7 @@ TEST_CONFIG = AppConfig(
     break_duration=5,
     poll_interval=1,
     idle_threshold=20,
+    fullscreen_transition_ticks=2,
 )
 
 
@@ -129,7 +135,8 @@ class ControllerTests(unittest.TestCase):
         )
 
         with mock.patch(
-            "eyes_protector.controller.is_fullscreen_or_busy", return_value=False
+            "eyes_protector.controller.get_platform_busy_reason",
+            return_value=BUSY_REASON_NONE,
         ):
             with mock.patch("eyes_protector.controller.get_idle_time", return_value=0):
                 controller.run_timer()
@@ -185,6 +192,43 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(root.after_cancel_calls, [initial_job])
         self.assertEqual(controller.fullscreen.hide_calls, 1)
         self.assertEqual(destroy_mock.call_count, 4)
+
+    def test_fullscreen_busy_reason_is_debounced_before_freezing_timer(self):
+        root, controller = self._build_controller()
+        controller.runtime = controller.runtime.__class__(
+            time_elapsed=4,
+            target_interval=controller.runtime.target_interval,
+            state=controller.runtime.state,
+            paused=controller.runtime.paused,
+            floating_visible=controller.runtime.floating_visible,
+            running=controller.runtime.running,
+        )
+
+        with mock.patch(
+            "eyes_protector.controller.get_platform_busy_reason",
+            side_effect=[
+                BUSY_REASON_FULLSCREEN,
+                BUSY_REASON_FULLSCREEN,
+                BUSY_REASON_NONE,
+                BUSY_REASON_NONE,
+            ],
+        ):
+            with mock.patch("eyes_protector.controller.get_idle_time", return_value=0):
+                controller.run_timer()
+                self.assertEqual(controller.runtime.time_elapsed, 5)
+                self.assertTrue(controller.runtime.floating_visible)
+
+                controller.run_timer()
+                self.assertEqual(controller.runtime.time_elapsed, 5)
+                self.assertFalse(controller.runtime.floating_visible)
+
+                controller.run_timer()
+                self.assertEqual(controller.runtime.time_elapsed, 5)
+                self.assertFalse(controller.runtime.floating_visible)
+
+                controller.run_timer()
+                self.assertEqual(controller.runtime.time_elapsed, 6)
+                self.assertTrue(controller.runtime.floating_visible)
 
 
 if __name__ == "__main__":

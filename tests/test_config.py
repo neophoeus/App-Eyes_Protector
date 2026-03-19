@@ -10,6 +10,7 @@ class LoadConfigTests(unittest.TestCase):
         self.assertEqual(config.snooze_interval, 5)
         self.assertEqual(config.break_duration, 5)
         self.assertEqual(config.idle_threshold, 20)
+        self.assertEqual(config.fullscreen_transition_ticks, 1)
 
     def test_loads_default_profile(self):
         config = load_config(["main.py"])
@@ -17,6 +18,7 @@ class LoadConfigTests(unittest.TestCase):
         self.assertEqual(config.snooze_interval, 5 * 60)
         self.assertEqual(config.break_duration, 20)
         self.assertEqual(config.idle_threshold, 300)
+        self.assertEqual(config.fullscreen_transition_ticks, 2)
 
 
 if __name__ == "__main__":

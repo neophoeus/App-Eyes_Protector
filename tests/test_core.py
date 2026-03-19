@@ -2,6 +2,9 @@ import unittest
 
 from eyes_protector.config import AppConfig
 from eyes_protector.core import (
+    BUSY_REASON_FULLSCREEN,
+    BUSY_REASON_IDLE,
+    BUSY_REASON_NONE,
     STATE_BREAKING,
     STATE_DIALOG_VISIBLE,
     STATE_RUNNING,
@@ -21,11 +24,12 @@ TEST_CONFIG = AppConfig(
     break_duration=5,
     poll_interval=1,
     idle_threshold=20,
+    fullscreen_transition_ticks=1,
 )
 
 
 class CoreStateTests(unittest.TestCase):
-    def test_busy_tick_resets_elapsed_and_hides_widget(self):
+    def test_idle_tick_resets_elapsed_and_hides_widget(self):
         runtime = create_runtime_state(TEST_CONFIG)
         runtime = runtime.__class__(
             time_elapsed=7,
@@ -36,9 +40,26 @@ class CoreStateTests(unittest.TestCase):
             running=runtime.running,
         )
 
-        result = apply_tick(runtime, TEST_CONFIG, is_busy=True)
+        result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_IDLE)
 
         self.assertEqual(result.runtime.time_elapsed, 0)
+        self.assertFalse(result.runtime.floating_visible)
+        self.assertFalse(result.should_show_dialog)
+
+    def test_fullscreen_tick_freezes_elapsed_and_hides_widget(self):
+        runtime = create_runtime_state(TEST_CONFIG)
+        runtime = runtime.__class__(
+            time_elapsed=7,
+            target_interval=runtime.target_interval,
+            state=runtime.state,
+            paused=runtime.paused,
+            floating_visible=True,
+            running=runtime.running,
+        )
+
+        result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_FULLSCREEN)
+
+        self.assertEqual(result.runtime.time_elapsed, 7)
         self.assertFalse(result.runtime.floating_visible)
         self.assertFalse(result.should_show_dialog)
 
@@ -54,7 +75,7 @@ class CoreStateTests(unittest.TestCase):
             running=runtime.running,
         )
 
-        result = apply_tick(runtime, TEST_CONFIG, is_busy=False)
+        result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_NONE)
 
         self.assertEqual(result.runtime.time_elapsed, 4)
         self.assertEqual(result.runtime.state, STATE_RUNNING)
@@ -71,7 +92,7 @@ class CoreStateTests(unittest.TestCase):
             running=runtime.running,
         )
 
-        result = apply_tick(runtime, TEST_CONFIG, is_busy=False)
+        result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_NONE)
 
         self.assertEqual(result.runtime.state, STATE_DIALOG_VISIBLE)
         self.assertFalse(result.runtime.floating_visible)

@@ -8,6 +8,7 @@ class AppConfig:
     break_duration: int
     poll_interval: int
     idle_threshold: int
+    fullscreen_transition_ticks: int
 
 
 def load_config(argv):
@@ -18,6 +19,7 @@ def load_config(argv):
             break_duration=5,
             poll_interval=1,
             idle_threshold=20,
+            fullscreen_transition_ticks=1,
         )
     return AppConfig(
         break_interval=20 * 60,
@@ -25,4 +27,5 @@ def load_config(argv):
         break_duration=20,
         poll_interval=1,
         idle_threshold=300,
+        fullscreen_transition_ticks=2,
     )

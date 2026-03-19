@@ -4,6 +4,9 @@ from dataclasses import dataclass, replace
 STATE_RUNNING = "RUNNING"
 STATE_DIALOG_VISIBLE = "DIALOG_VISIBLE"
 STATE_BREAKING = "BREAKING"
+BUSY_REASON_NONE = "NONE"
+BUSY_REASON_IDLE = "IDLE"
+BUSY_REASON_FULLSCREEN = "FULLSCREEN"
 
 
 @dataclass(frozen=True)
@@ -32,14 +35,17 @@ def toggle_pause(runtime):
     return replace(runtime, paused=paused, time_elapsed=time_elapsed)
 
 
-def apply_tick(runtime, config, is_busy):
+def apply_tick(runtime, config, busy_reason=BUSY_REASON_NONE):
     if not runtime.running:
         return TickResult(runtime)
     if runtime.state != STATE_RUNNING:
         return TickResult(runtime)
 
-    if is_busy:
+    if busy_reason == BUSY_REASON_IDLE:
         return TickResult(replace(runtime, time_elapsed=0, floating_visible=False))
+
+    if busy_reason == BUSY_REASON_FULLSCREEN:
+        return TickResult(replace(runtime, floating_visible=False))
 
     updated = replace(runtime, floating_visible=True)
     if updated.paused:
