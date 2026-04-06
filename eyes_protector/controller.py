@@ -28,6 +28,7 @@ class EyesProtectorController:
         self._effective_busy_reason = BUSY_REASON_NONE
         self._fullscreen_busy_streak = 0
         self._fullscreen_clear_streak = 0
+        self._quitting = False
         self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule(100)
 
@@ -134,12 +135,19 @@ class EyesProtectorController:
         self._sync_tick_schedule()
 
     def start_full_break(self):
+        previous_runtime = self.runtime
         previous_visibility = self.runtime.floating_visible
         self.runtime = apply_start_break(self.runtime)
         if previous_visibility != self.runtime.floating_visible:
             self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule()
-        self.fullscreen.show()
+        try:
+            self.fullscreen.show()
+        except Exception:
+            self.runtime = previous_runtime
+            self._set_floating_visibility(self.runtime.floating_visible)
+            self._sync_tick_schedule()
+            raise
 
     def finish_break(self):
         previous_visibility = self.runtime.floating_visible
@@ -148,11 +156,26 @@ class EyesProtectorController:
             self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule()
 
-    def quit_app(self):
-        self.runtime = apply_quit(self.runtime)
-        self._cancel_tick()
-        self.fullscreen.hide()
+    def _destroy_windows(self):
         safe_destroy_window(self.floating.window)
         safe_destroy_window(self.dialog.window)
         safe_destroy_window(self.fullscreen.window)
         safe_destroy_window(self.root)
+
+    def quit_app(self):
+        if self._quitting:
+            return
+        self._quitting = True
+        self.runtime = apply_quit(self.runtime)
+        self._cancel_tick()
+        self.fullscreen.hide()
+        self.dialog.hide()
+        self.floating.hide()
+        after_idle = getattr(self.root, "after_idle", None)
+        if after_idle is None:
+            self._destroy_windows()
+            return
+        try:
+            after_idle(self._destroy_windows)
+        except Exception:
+            self._destroy_windows()

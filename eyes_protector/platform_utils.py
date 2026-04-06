@@ -33,6 +33,94 @@ class MONITORINFO(ctypes.Structure):
 MONITOR_DEFAULTTONEAREST = 2
 ERROR_ALREADY_EXISTS = 183
 FULLSCREEN_MARGIN_PX = 2
+BASE_DPI = 96
+PROCESS_PER_MONITOR_DPI_AWARE = 2
+E_ACCESSDENIED = 0x80070005
+DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_void_p(-4)
+
+
+def _is_access_denied_hresult(result):
+    return result in (E_ACCESSDENIED, ctypes.c_long(E_ACCESSDENIED).value)
+
+
+def _try_set_per_monitor_dpi_awareness_v2():
+    try:
+        user32 = ctypes.windll.user32
+        setter = user32.SetProcessDpiAwarenessContext
+    except Exception:
+        return False
+    try:
+        return bool(setter(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+    except Exception:
+        return False
+
+
+def _try_set_per_monitor_dpi_awareness():
+    try:
+        shcore = ctypes.windll.shcore
+        setter = shcore.SetProcessDpiAwareness
+    except Exception:
+        return False
+    try:
+        result = setter(PROCESS_PER_MONITOR_DPI_AWARE)
+    except Exception:
+        return False
+    return result == 0 or _is_access_denied_hresult(result)
+
+
+def _try_set_system_dpi_awareness():
+    try:
+        user32 = ctypes.windll.user32
+        setter = user32.SetProcessDPIAware
+    except Exception:
+        return False
+    try:
+        return bool(setter())
+    except Exception:
+        return False
+
+
+def enable_high_dpi_mode():
+    strategies = (
+        ("per-monitor-v2", _try_set_per_monitor_dpi_awareness_v2),
+        ("per-monitor", _try_set_per_monitor_dpi_awareness),
+        ("system", _try_set_system_dpi_awareness),
+    )
+    for name, strategy in strategies:
+        if strategy():
+            return name
+    return "unavailable"
+
+
+def _extract_window_handle(window):
+    if window is None:
+        return None
+    try:
+        return window.winfo_id()
+    except Exception:
+        return None
+
+
+def get_window_dpi(window=None, hwnd=None):
+    if hwnd is None:
+        hwnd = _extract_window_handle(window)
+    try:
+        user32 = ctypes.windll.user32
+        if hwnd and hasattr(user32, "GetDpiForWindow"):
+            dpi = int(user32.GetDpiForWindow(hwnd))
+            if dpi > 0:
+                return dpi
+        if hasattr(user32, "GetDpiForSystem"):
+            dpi = int(user32.GetDpiForSystem())
+            if dpi > 0:
+                return dpi
+    except Exception:
+        pass
+    return BASE_DPI
+
+
+def get_window_dpi_scale(window=None, hwnd=None):
+    return get_window_dpi(window=window, hwnd=hwnd) / BASE_DPI
 
 
 def _query_user_notification_state():

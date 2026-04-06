@@ -2,6 +2,32 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v2.0 - 2026-04-06
+
+### Added
+
+- Windows DPI awareness bootstrap and DPI geometry helpers were added so the reminder dialog and floating widget can render sharply on 4K displays while keeping their apparent on-screen size close to the previous behavior.
+- Lightweight UI geometry smoke tests were added to cover DPI scaling helpers, reminder dialog sizing, floating widget geometry, and the full-screen card layout.
+- Controller and platform utility tests were expanded to cover DPI bootstrap fallback, full-screen break startup rollback, and the hardened quit flow.
+
+### Changed
+
+- The full-screen break page was redesigned around a large centered countdown with guide, completion, and interruption copy placed directly beneath it on a minimalist static backdrop.
+- The full-screen break experience was simplified into a calmer matcha-toned canvas with a softer early-exit hover chip and lower visual noise.
+- The floating widget now uses refreshed canvas-drawn eye, pause/play, and close controls instead of emoji-style glyph rendering.
+- The moving leaf animation was removed entirely, lowering break-screen power usage and leaving a static calm backdrop.
+- The top-right early-exit affordance on the full-screen break page is now a clearer close chip instead of a lone text glyph.
+
+### Fixed
+
+- Starting a full-screen break now restores the prior runtime state and floating-widget visibility if the break window fails to initialize.
+- App shutdown now ignores repeated quit requests and hides all windows before deferred destruction, avoiding Tk teardown races and orphaned UI.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `EyesProtector.exe --test`
+
 ## v1.8 - 2026-03-19
 
 ### Added
@@ -52,6 +78,32 @@ All notable changes to App-Eyes Protector are documented here.
 # 版本紀錄
 
 App-Eyes Protector 的重要變更統一記錄於此。
+
+## v2.0 - 2026-04-06
+
+### 新增
+
+- 新增 Windows DPI awareness 啟動流程與 DPI 幾何 helper，讓提醒視窗與懸浮視窗在 4K 螢幕上能以更清晰的原生解析度呈現，同時維持接近原本的視覺尺寸。
+- 新增輕量級 UI 幾何 smoke tests，覆蓋 DPI 縮放 helper、提醒視窗尺寸、懸浮視窗幾何與全螢幕卡片版面計算。
+- 擴充 controller 與 platform utility 測試，補上 DPI 啟動 fallback、全螢幕休息啟動失敗回滾與退出流程強化的覆蓋。
+
+### 調整
+
+- 全螢幕休息頁改為中央大倒數，並將提醒說明、完成後文字與提早中斷文字統一放在倒數下方，形成更極簡的全螢幕構圖。
+- 全螢幕休息體驗進一步簡化為更安靜的抹茶色靜態背景，並搭配更柔和的提早結束 hover 圓形按鈕，降低視覺噪音。
+- 懸浮窗改為重新繪製的 canvas 眼睛圖示與 pause/play、close 控制元件，不再依賴 emoji 風格符號。
+- 直接移除落葉動態背景，改用靜態且更省電的休息頁背景。
+- 全螢幕右上角的提早結束入口改為更清楚的 close chip，不再只顯示單一文字符號。
+
+### 修正
+
+- 若全螢幕休息視窗初始化失敗，現在會正確回復先前 runtime 狀態與懸浮窗可見性，不會卡在半進入休息的中間狀態。
+- 退出程式時現在會忽略重複 quit 請求，並先隱藏所有視窗再延後銷毀，避免 Tk 關閉競態與殘留視窗。
+
+### 驗證
+
+- 單元測試：`python -m unittest discover -s tests -v`
+- 手動 smoke test：`EyesProtector.exe --test`
 
 ## v1.8 - 2026-03-19
 

@@ -7,6 +7,44 @@ from eyes_protector.core import BUSY_REASON_FULLSCREEN, BUSY_REASON_NONE
 
 
 class PlatformUtilsTests(unittest.TestCase):
+    def test_enable_high_dpi_mode_prefers_per_monitor_v2(self):
+        with mock.patch(
+            "eyes_protector.platform_utils._try_set_per_monitor_dpi_awareness_v2",
+            return_value=True,
+        ):
+            with mock.patch(
+                "eyes_protector.platform_utils._try_set_per_monitor_dpi_awareness"
+            ) as per_monitor_mock:
+                with mock.patch(
+                    "eyes_protector.platform_utils._try_set_system_dpi_awareness"
+                ) as system_mock:
+                    self.assertEqual(
+                        platform_utils.enable_high_dpi_mode(), "per-monitor-v2"
+                    )
+                    per_monitor_mock.assert_not_called()
+                    system_mock.assert_not_called()
+
+    def test_enable_high_dpi_mode_falls_back_to_system(self):
+        with mock.patch(
+            "eyes_protector.platform_utils._try_set_per_monitor_dpi_awareness_v2",
+            return_value=False,
+        ):
+            with mock.patch(
+                "eyes_protector.platform_utils._try_set_per_monitor_dpi_awareness",
+                return_value=False,
+            ):
+                with mock.patch(
+                    "eyes_protector.platform_utils._try_set_system_dpi_awareness",
+                    return_value=True,
+                ):
+                    self.assertEqual(platform_utils.enable_high_dpi_mode(), "system")
+
+    def test_get_window_dpi_scale_uses_base_dpi_ratio(self):
+        with mock.patch(
+            "eyes_protector.platform_utils.get_window_dpi", return_value=144
+        ):
+            self.assertEqual(platform_utils.get_window_dpi_scale(hwnd=123), 1.5)
+
     def test_get_platform_busy_reason_uses_notification_state(self):
         with mock.patch(
             "eyes_protector.platform_utils._query_user_notification_state",

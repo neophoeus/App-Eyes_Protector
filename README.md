@@ -8,7 +8,7 @@
 
 A highly lightweight, zero-dependency, immersive eye protection assistant for Windows.
 
-**Latest Release:** v1.8  
+**Latest Release:** v2.0  
 **Release Notes:** See [CHANGELOG.md](CHANGELOG.md)
 
 > **What is the 20-20-20 Rule?**  
@@ -19,16 +19,17 @@ A highly lightweight, zero-dependency, immersive eye protection assistant for Wi
 ### 💡 Core Highlights
 
 1. **High-Quality Undisturbed Persistence**: Automatically hides in the background. Only a high-quality "semi-transparent rounded rectangular eye" floating widget stays in the corner of the screen. Hovering the mouse allows you to quickly and safely exit without forcibly interrupting your workflow.
-2. **Rendering Aesthetics, Immersive Relaxation**: Discarding traditional rigid static images, it uses pure mathematical calculations to generate 3D geometric falling leaves and breeze animations, creating a 20-second breathing moment where "your heartbeat slows down with the screen".
+2. **Rendering Aesthetics, Calmer Break Focus**: The full-screen break page now uses a minimalist full-screen composition with a centered countdown, soft guide copy below it, and a static low-power matcha backdrop for a cleaner 20-second rest moment.
 3. **Green & Lightweight, Ready to Use**: Zero external package dependencies, no installation required. It consists of a single Python executable (.exe) that purely calls Windows native APIs, along with simple startup/shutdown scripts.
-4. **Smarter and Calmer Break Flow**: Idle time, full-screen playback, and presentation mode now use distinct reminder pause strategies, while the full-screen break view has been simplified into a cleaner split layout with a lower-power animation profile.
+4. **Smarter and Calmer Break Flow**: Idle time, full-screen playback, and presentation mode now use distinct reminder pause strategies, while the full-screen break view has been redesigned into a centered countdown layout with a lower-power static backdrop.
 
 ### ⚙️ Technical Principles
 
 - **Environment Detection & Power Friendly**: Intelligently determines whether the user is in full-screen gaming, watching a video, or presenting by combining Windows native API (`SHQueryUserNotificationState`), foreground full-screen window detection, and hardware input monitoring (`GetLastInputInfo`). Even if the mouse is still moving, full-screen playback or presentation mode will pause reminder timing. Moreover, it boasts an ultra-optimized event loop that **will not prevent Windows from automatically turning off the display or entering sleep mode**.
 - **Reason-Aware Reminder Freeze**: The timer now distinguishes between idle absence and full-screen focus. Idle resets the elapsed reminder time, while full-screen playback or presentation freezes the timer in place and uses transition debounce to avoid jitter when entering or leaving full-screen mode.
-- **Smart Pause**: Need absolute focus? Just unfold the widget and click the pause (`⏸`) button. The eye protector icon will smoothly transition into a newly designed, canvas-drawn "closed eye" indicator, and the timer will freeze. Resuming the timer will automatically start counting from zero, keeping the flow going naturally.
-- **Rendering Engine**: Zero image file dependencies, entirely built using the Python `tkinter.Canvas` native drawing tool. It combines mathematical geometry (trigonometric functions and random variables) to construct a lower-power falling leaf animation and features a pure-code-rendered high-quality transparent floating UI with custom-drawn eye icons.
+- **Smart Pause**: Need absolute focus? Just unfold the widget and click the canvas-drawn pause control. The eye protector icon will smoothly transition into a newly designed, canvas-drawn "closed eye" indicator, and the timer will freeze. Resuming the timer will automatically start counting from zero, keeping the flow going naturally.
+- **Rendering Engine**: Zero image file dependencies, entirely built using the Python `tkinter.Canvas` native drawing tool. It now uses native Windows DPI awareness for sharper 4K rendering, paired with pure-code floating UI controls and icons for more consistent visual output.
+- **Safer Break Startup and Exit**: If the full-screen break window cannot initialize, the app now restores the previous runtime state instead of leaving the session half-transitioned. Quit requests are also guarded so repeated clicks cannot trigger a broken shutdown sequence.
 - **Ultra-Lightweight Deployment**: Discards all external third-party packages and uses PyInstaller to package into a single background executable (`EyesProtector.exe`), paired with BAT batch scripts for easy auto-startup on boot and uninstallation.
 
 ### 🚀 Quick Start
@@ -46,8 +47,8 @@ This project has been compiled into a single portable executable using PyInstall
 
 - **Test Animation Effects**: You can run `EyesProtector.exe --test` from the terminal to immediately test the 10-second reminder and 5-second break.
 - **Keyboard Shortcuts**: When the popup appears, press **Enter** to instantly start the 20-second break, or press **Escape** to snooze for 5 minutes.
-- **Interrupt Break**: When the full-screen leaves are falling, if you urgently need to return to work, click the `✕` symbol in the top-right corner to end the break early and return to background timing.
-- **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click `⏸` to pause the protection, or click the red `✕` on the expanded panel to safely end it.
+- **Interrupt Break**: If you urgently need to return to work during a break, click the top-right close chip to end the break early and return to background timing.
+- **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click the canvas-drawn pause control to pause protection, or click the red close control on the expanded panel to safely end it.
 
 ### 🛠️ Development and Building
 
@@ -72,14 +73,15 @@ python -m unittest discover -s tests -v
 
 #### Manual Verification Checklist
 
-1. Run `EyesProtector.exe --test` and confirm the floating widget appears near the bottom-right corner.
-2. Hover the widget and verify the pause and close controls expand correctly.
+1. Run `EyesProtector.exe --test` and confirm the floating widget appears near the bottom-right corner and renders sharply on a 4K display.
+2. Hover the widget and verify the pause and close controls expand correctly, with the canvas-drawn icons remaining crisp.
 3. Click pause, wait 10 seconds, and confirm no reminder dialog appears while paused.
 4. Resume and confirm the reminder countdown restarts from zero instead of resuming the old elapsed time.
 5. When the reminder dialog appears, press `Esc` and confirm the next reminder is delayed by about 5 seconds in test mode.
-6. Trigger the reminder again, press `Enter`, and confirm the full-screen break opens and counts down.
-7. During the break, click the top-right `✕` and confirm the break ends immediately without delayed follow-up callbacks.
+6. Trigger the reminder again, press `Enter`, and confirm the full-screen break opens with a centered countdown and the guide text clearly spaced below it.
+7. During the break, click the top-right close chip and confirm the break ends immediately without delayed follow-up callbacks.
 8. Relaunch the app while it is already running and confirm the single-instance prompt appears.
+9. Open the floating widget and click the close control; confirm the app exits cleanly without orphaned windows or repeated shutdown prompts.
 
 ---
 
@@ -87,7 +89,7 @@ python -m unittest discover -s tests -v
 
 一款極輕量、零依賴的 Windows 沉浸式護眼助理。
 
-**最新版本：** v1.8  
+**最新版本：** v2.0  
 **版本說明：** 請見 [CHANGELOG.md](CHANGELOG.md)
 
 > **什麼是 20-20-20 護眼法則？**  
@@ -98,16 +100,17 @@ python -m unittest discover -s tests -v
 ### 💡 核心亮點
 
 1. **高質感無擾常駐**：平時自動隱藏於系統背景，僅在畫面角落常駐一顆高質感的「半透明方形圓角眼睛」懸浮窗格，滑鼠移入即可快速安全退出，不強暴中斷您的工作心流。
-2. **算繪美學，沉浸放鬆**：捨棄傳統呆板的靜態圖，運用純數學運算生成 3D 幾何落葉與微風動畫，打造 20 秒「心跳跟著畫面慢下來」的呼吸時刻。
+2. **畫面更穩、更聚焦**：全螢幕休息頁改為極簡的中央大倒數構圖，搭配下方清楚留白的引導文字與靜態抹茶背景，讓 20 秒休息的主視覺更乾淨、辨識更直接。
 3. **綠色輕量，隨開即用**：零外部套件依賴、免安裝。由一支純粹呼叫 Windows 原生 API 的 Python 單一執行檔 (.exe) 與簡易的開關腳本構成。
-4. **提醒邏輯更穩、休息畫面更俐落**：離席、全螢幕播放與簡報模式現在採用不同停表策略；全螢幕休息畫面則改為更乾淨的雙欄版面，並使用更省電的動畫設定。
+4. **提醒邏輯更穩、休息畫面更俐落**：離席、全螢幕播放與簡報模式現在採用不同停表策略；全螢幕休息畫面則改為中央倒數的極簡版面，並移除動態落葉以降低功耗。
 
 ### ⚙️ 技術原理
 
 - **環境與電源偵測**：透過結合 Windows 底層原生 API (`SHQueryUserNotificationState`)、前景全螢幕視窗判定與硬體事件 (`GetLastInputInfo`)，智慧判斷使用者是否看影片、玩遊戲、簡報或離開座位，避免打擾。即使滑鼠仍有移動，只要正在全螢幕播放或簡報也會停止倒數。更具備極度優化的事件迴圈，**絕不會阻擋 Windows 系統自動關閉螢幕或進入休眠狀態**。
 - **原因分流停表策略**：現在會區分「離席」與「全螢幕專注」兩種 busy 原因。離席時會將提醒倒數歸零；全螢幕播放或簡報時則凍結目前進度，並加入進出場 debounce，避免全螢幕切換瞬間造成計時抖動。
-- **貼心暫停模式**：需要絕對專注？將滑鼠移至懸浮窗並點擊暫停 (`⏸`) 按鈕。護眼圖示將平滑切換為高質感的「閉眼休息」專屬繪製圖示，且計時器完全凍結；當再次恢復防護時會自動「從零開始重新計時」，給予最無壓力的轉場體驗。
-- **渲染引擎**：零圖檔依賴，完全使用 Python `tkinter.Canvas` 原生繪圖工具。結合數學幾何（三角函數與隨機變數）建構更省電的落葉動畫，並具備純代碼渲染的高質感去背懸浮 UI 與專屬繪製的狀態圖示。
+- **貼心暫停模式**：需要絕對專注？將滑鼠移至懸浮窗並點擊重新繪製的 canvas 暫停控制。護眼圖示會平滑切換為高質感的「閉眼休息」專屬繪製圖示，且計時器完全凍結；當再次恢復防護時會自動「從零開始重新計時」，給予最無壓力的轉場體驗。
+- **渲染引擎**：零圖檔依賴，完全使用 Python `tkinter.Canvas` 原生繪圖工具，並透過 Windows DPI awareness 提升 4K 螢幕上的清晰度，搭配純代碼渲染的懸浮 UI 控制與專屬狀態圖示。
+- **更安全的休息切換與退出流程**：若全螢幕休息視窗初始化失敗，程式現在會自動回復到原本狀態，不會卡在半切換狀態；退出請求也有防重入保護，避免重複點擊造成異常關閉流程。
 - **極輕量部署**：捨棄所有外部第三方套件，並透過 PyInstaller 打包為單一背景執行檔 (`EyesProtector.exe`)，搭配 BAT 批次腳本達成簡易的開機自動啟動與卸載。
 
 ### 🚀 快速上手
@@ -125,8 +128,8 @@ python -m unittest discover -s tests -v
 
 - **測試動畫效果**：您可以從終端機執行 `EyesProtector.exe --test` 來立即測試 10 秒提醒與 5 秒休息。
 - **鍵盤快捷鍵支援**：當倒數視窗跳出時，可直接按下 **Enter** 鍵進入 20 秒大休息，或是按下 **Escape** 鍵將提醒延遲 5 分鐘。
-- **中斷休息**：當全螢幕樹葉飄落時，若需緊急回到工作，點擊畫面右上角的 `✕` 符號即可提早結束本次休息並退回背景計時。
-- **暫停或退出程式**：若欲暫停測量或完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，展開面板後可點擊 `⏸` 按鈕進入凍結暫停模式，或點擊紅色 `✕` 安全結束常駐。
+- **中斷休息**：若需緊急回到工作，點擊全螢幕右上角的 close chip 即可提早結束本次休息並退回背景計時。
+- **暫停或退出程式**：若欲暫停測量或完全關閉護眼助理，請對著畫面右下角的「半透明眼睛懸浮窗格」移入滑鼠，展開面板後可點擊 canvas 暫停控制進入凍結暫停模式，或點擊紅色 close 控制安全結束常駐。
 
 ### 🛠️ 開發與編譯
 
@@ -151,11 +154,12 @@ python -m unittest discover -s tests -v
 
 #### 手動驗證清單
 
-1. 執行 `EyesProtector.exe --test`，確認右下角出現懸浮窗。
-2. 滑鼠移入懸浮窗，確認暫停與關閉按鈕會正確展開。
+1. 執行 `EyesProtector.exe --test`，確認右下角出現懸浮窗，且在 4K 螢幕上仍保持清晰。
+2. 滑鼠移入懸浮窗，確認暫停與關閉控制會正確展開，且重新繪製的 canvas 圖示保持銳利。
 3. 點擊暫停後等待 10 秒，確認暫停期間不會跳出提醒視窗。
 4. 重新恢復後，確認提醒倒數會從零重新開始，而不是沿用先前進度。
 5. 當提醒視窗出現時按下 `Esc`，確認 test 模式下約 5 秒後才再次提醒。
-6. 再次觸發提醒後按下 `Enter`，確認全螢幕休息視窗正常顯示並倒數。
-7. 在休息視窗中點擊右上角 `✕`，確認可以立即結束，且不會殘留延遲 callback。
+6. 再次觸發提醒後按下 `Enter`，確認全螢幕休息視窗以中央倒數搭配下方引導文字的形式正常顯示。
+7. 在休息視窗中點擊右上角 close chip，確認可以立即結束，且不會殘留延遲 callback。
 8. 在程式已執行時再次啟動，確認單實例提示視窗正常出現。
+9. 展開懸浮窗後點擊 close 控制，確認程式會乾淨退出，不會殘留視窗或出現重複關閉提示。

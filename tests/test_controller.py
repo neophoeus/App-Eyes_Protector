@@ -50,9 +50,13 @@ class FakeDialog:
         self.controller = controller
         self.window = FakeWindow()
         self.show_calls = 0
+        self.hide_calls = 0
 
     def show(self):
         self.show_calls += 1
+
+    def hide(self):
+        self.hide_calls += 1
 
 
 class FakeFloating:
@@ -160,6 +164,24 @@ class ControllerTests(unittest.TestCase):
 
         self.assertEqual(root.after_calls[-1][0], TEST_CONFIG.poll_interval * 1000)
         self.assertIsNotNone(controller._tick_job)
+
+    def test_start_full_break_restores_state_when_fullscreen_show_fails(self):
+        root, controller = self._build_controller()
+
+        initial_job = controller._tick_job
+        initial_show_calls = controller.floating.show_calls
+        controller.fullscreen.show = mock.Mock(side_effect=RuntimeError("boom"))
+
+        with self.assertRaises(RuntimeError):
+            controller.start_full_break()
+
+        self.assertEqual(controller.runtime.state, STATE_RUNNING)
+        self.assertTrue(controller.runtime.floating_visible)
+        self.assertEqual(root.after_cancel_calls, [initial_job])
+        self.assertEqual(root.after_calls[-1][0], TEST_CONFIG.poll_interval * 1000)
+        self.assertIsNotNone(controller._tick_job)
+        self.assertEqual(controller.floating.hide_calls, 1)
+        self.assertEqual(controller.floating.show_calls, initial_show_calls + 1)
 
     def test_snooze_from_dialog_state_reschedules_tick(self):
         root, controller = self._build_controller()
