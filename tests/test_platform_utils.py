@@ -127,6 +127,7 @@ class PlatformUtilsTests(unittest.TestCase):
                 run_mock.assert_not_called()
 
     def test_force_close_existing_instance_targets_current_executable_only(self):
+        import os
         completed = subprocess.CompletedProcess(args=["taskkill"], returncode=0)
         with mock.patch(
             "eyes_protector.platform_utils.get_closable_instance_image_name",
@@ -139,7 +140,7 @@ class PlatformUtilsTests(unittest.TestCase):
                 run_mock.assert_called_once()
                 args = run_mock.call_args.args[0]
                 self.assertEqual(
-                    args, ["taskkill", "/F", "/IM", "EyesProtector.exe", "/T"]
+                    args, ["taskkill", "/F", "/FI", f"PID ne {os.getpid()}", "/IM", "EyesProtector.exe", "/T"]
                 )
 
     def test_check_single_instance_keeps_mutex_on_success(self):
@@ -152,6 +153,93 @@ class PlatformUtilsTests(unittest.TestCase):
             platform_utils.check_single_instance(root)
 
         self.assertIs(root.mutex, mutex)
+
+    def test_check_single_instance_already_running_user_says_yes_close_success(self):
+        root = mock.Mock()
+        mutex = object()
+        # Mock create_single_instance_mutex to return a valid mutex and ERROR_ALREADY_EXISTS
+        with mock.patch(
+            "eyes_protector.platform_utils.create_single_instance_mutex",
+            return_value=(mutex, platform_utils.ERROR_ALREADY_EXISTS),
+        ):
+            # Mock askyesno to return True (User clicked "Yes" to close)
+            with mock.patch(
+                "eyes_protector.platform_utils.messagebox.askyesno",
+                return_value=True,
+            ) as askyesno_mock:
+                # Mock force_close_existing_instance to return True (Successfully closed)
+                with mock.patch(
+                    "eyes_protector.platform_utils.force_close_existing_instance",
+                    return_value=True,
+                ) as force_close_mock:
+                    # Mock showinfo to ensure it's not called on success
+                    with mock.patch(
+                        "eyes_protector.platform_utils.messagebox.showinfo"
+                    ) as showinfo_mock:
+                        with self.assertRaises(SystemExit) as exit_info:
+                            platform_utils.check_single_instance(root)
+
+        self.assertEqual(exit_info.exception.code, 0)
+        root.withdraw.assert_called_once()
+        root.attributes.assert_called_once_with("-topmost", True)
+        askyesno_mock.assert_called_once()
+        force_close_mock.assert_called_once()
+        showinfo_mock.assert_not_called()
+
+    def test_check_single_instance_already_running_user_says_yes_close_fail(self):
+        root = mock.Mock()
+        mutex = object()
+        with mock.patch(
+            "eyes_protector.platform_utils.create_single_instance_mutex",
+            return_value=(mutex, platform_utils.ERROR_ALREADY_EXISTS),
+        ):
+            with mock.patch(
+                "eyes_protector.platform_utils.messagebox.askyesno",
+                return_value=True,
+            ) as askyesno_mock:
+                with mock.patch(
+                    "eyes_protector.platform_utils.force_close_existing_instance",
+                    return_value=False,
+                ) as force_close_mock:
+                    with mock.patch(
+                        "eyes_protector.platform_utils.messagebox.showinfo"
+                    ) as showinfo_mock:
+                        with self.assertRaises(SystemExit) as exit_info:
+                            platform_utils.check_single_instance(root)
+
+        self.assertEqual(exit_info.exception.code, 0)
+        root.withdraw.assert_called_once()
+        root.attributes.assert_called_once_with("-topmost", True)
+        askyesno_mock.assert_called_once()
+        force_close_mock.assert_called_once()
+        showinfo_mock.assert_called_once()
+
+    def test_check_single_instance_already_running_user_says_no(self):
+        root = mock.Mock()
+        mutex = object()
+        with mock.patch(
+            "eyes_protector.platform_utils.create_single_instance_mutex",
+            return_value=(mutex, platform_utils.ERROR_ALREADY_EXISTS),
+        ):
+            with mock.patch(
+                "eyes_protector.platform_utils.messagebox.askyesno",
+                return_value=False,
+            ) as askyesno_mock:
+                with mock.patch(
+                    "eyes_protector.platform_utils.force_close_existing_instance"
+                ) as force_close_mock:
+                    with mock.patch(
+                        "eyes_protector.platform_utils.messagebox.showinfo"
+                    ) as showinfo_mock:
+                        with self.assertRaises(SystemExit) as exit_info:
+                            platform_utils.check_single_instance(root)
+
+        self.assertEqual(exit_info.exception.code, 0)
+        root.withdraw.assert_called_once()
+        root.attributes.assert_called_once_with("-topmost", True)
+        askyesno_mock.assert_called_once()
+        force_close_mock.assert_not_called()
+        showinfo_mock.assert_not_called()
 
 
 if __name__ == "__main__":

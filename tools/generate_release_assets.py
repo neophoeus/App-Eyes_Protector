@@ -10,8 +10,8 @@ ASSETS_DIR = ROOT / "assets"
 ICON_PATH = ASSETS_DIR / "eyes_protector.ico"
 VERSION_INFO_PATH = ASSETS_DIR / "windows_version_info.txt"
 
-VERSION = "v2.0"
-FILE_VERSION_TUPLE = (2, 0, 0, 0)
+VERSION = "v2.1"
+FILE_VERSION_TUPLE = (2, 1, 0, 0)
 
 OUTPUT_SIZE = 256
 SCALE = 4

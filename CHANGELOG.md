@@ -2,6 +2,28 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v2.1 - 2026-06-05
+
+### Added
+
+- A feature to trigger a 20-second break immediately by clicking the open eye icon in the floating widget.
+- Comprehensive unit tests covering the immediate break trigger on the floating widget's eye icon, as well as when the eye is closed or when clicking outside.
+- Hardened unit tests covering user decisions in the single-instance resolution prompt (User chooses "Yes" with successful or failed close, and user chooses "No").
+
+### Changed
+
+- Enhanced the floating widget's hover expand/collapse mechanism to physically resize the window geometry (between collapsed 44px and expanded width) and slide it horizontally, ensuring the window positions properly against screen edges without clipping.
+- Added boundary checks during floating widget dragging to prevent it from being moved off-screen.
+- Added post-drag DPI self-adaptation to dynamically scale the floating widget's metrics, canvas size, background shapes, fonts, and controls when moved across displays of different DPIs.
+- Excluded the current process PID from `taskkill` filter during single instance resolution to avoid self-termination when checking/closing older instances.
+- Updated the VSCode workspace settings with organized imports on save, default formatting, basic type checking mode, and temporary folder exclusions.
+- Updated `build.bat` build script to locate python interpreter within local `.venv` subdirectory.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `EyesProtector.exe --test`
+
 ## v2.0 - 2026-04-06
 
 ### Added
@@ -78,6 +100,28 @@ All notable changes to App-Eyes Protector are documented here.
 # 版本紀錄
 
 App-Eyes Protector 的重要變更統一記錄於此。
+
+## v2.1 - 2026-06-05
+
+### 新增
+
+- 新增點擊懸浮視窗「睜開的眼睛圖示」可立即啟動 20 秒大休息的功能。
+- 新增針對懸浮視窗眼睛圖示點擊的單元測試（包含點擊睜開的眼睛啟動休息、點擊閉上的眼睛不啟動，以及點擊眼睛外部區域等場景）。
+- 新增單實例提示視窗處理邏輯的完整單元測試（包含使用者選擇「是」以關閉舊實例的成功/失敗路徑，以及使用者選擇「否」的路徑）。
+
+### 調整
+
+- 優化懸浮視窗收合與展開的幾何調整機制，實際切換視窗寬度（於收合 44px 與展開寬度之間）並在靠右時進行水平滑動位移，避免展開時超出螢幕或收合時位移不正確。
+- 新增懸浮視窗拖曳時的螢幕邊界檢查，防止視窗被拖曳出螢幕範圍。
+- 新增懸浮視窗拖曳釋放後的 DPI 自適應更新，當跨螢幕拖曳導致 DPI 改變時，動態更新縮放幾何、背景、字型、按鈕 Hitbox 等。
+- 強化單實例檢查的強制關閉邏輯，在 `taskkill` 時排除當前進程 PID，避免新啟動的實例誤殺自己。
+- 更新 `.vscode/settings.json` 以支援存檔自動排版、自動整理 Import、基礎型別檢查與排除打包暫存目錄。
+- 更新 `build.bat` 打包腳本，使其能優先尋找本地目錄下的 `.venv` Python 解譯器。
+
+### 驗證
+
+- 單元測試：`python -m unittest discover -s tests -v`
+- 手動 smoke test：`EyesProtector.exe --test`
 
 ## v2.0 - 2026-04-06
 

@@ -404,10 +404,11 @@ class FloatingWidget:
         self.window.update_idletasks()
         sw = self.window.winfo_screenwidth()
         sh = self.window.winfo_screenheight()
-        w, h = self.metrics.window_width, self.metrics.height
-        x = sw - w - self.metrics.margin_right
+        w_collapsed = scale_px(44, self.scale)
+        h = self.metrics.height
+        x = sw - w_collapsed - self.metrics.margin_right
         y = sh - h - self.metrics.margin_bottom
-        self.window.geometry(f"{w}x{h}+{x}+{y}")
+        self.window.geometry(f"{w_collapsed}x{h}+{x}+{y}")
         self._x = 0
         self._y = 0
         self._dragged = False
@@ -470,11 +471,21 @@ class FloatingWidget:
         self._collapse_job = None
         if self._pointer_inside_widget():
             return
+        if self._dragged or self._pressed_control is not None:
+            return
         old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
         self.window.attributes("-alpha", 0.6)
         self.canvas.coords(self.bg_id, *old_points)
         self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
-        self._expanded = False
+        if self._expanded:
+            # Resize window to collapsed width and slide right
+            right_x = self.window.winfo_x() + self.window.winfo_width()
+            w_collapsed = scale_px(44, self.scale)
+            h = self.metrics.height
+            new_x = right_x - w_collapsed
+            y = self.window.winfo_y()
+            self.window.geometry(f"{w_collapsed}x{h}+{new_x}+{y}")
+            self._expanded = False
         self._pause_hovered = False
         self._close_hovered = False
         self.canvas.itemconfig(self.txt_label, text="")
@@ -766,24 +777,51 @@ class FloatingWidget:
         deltay = event.y - self._y
         x = self.window.winfo_x() + deltax
         y = self.window.winfo_y() + deltay
+
+        # Boundary check to prevent moving window off screen
+        sw = self.window.winfo_screenwidth()
+        sh = self.window.winfo_screenheight()
+        w = self.window.winfo_width()
+        h = self.window.winfo_height()
+        x = max(0, min(x, sw - w))
+        y = max(0, min(y, sh - h))
+
         self.window.geometry(f"+{x}+{y}")
 
     def on_click(self, event):
         self._pressed_control = None
         if self._dragged:
             self._dragged = False
+            # Check and update DPI if it changed after drag release
+            self._check_and_update_dpi()
             return
+        # Check if the click is on the eye icon
+        ix1, iy1, ix2, iy2 = self.metrics.icon_box
+        if ix1 <= event.x <= ix2 and iy1 <= event.y <= iy2:
+            if not self.controller.paused:
+                self.controller.start_full_break()
+                return
         if not self._expanded:
             return
         self._dragged = False
 
     def on_hover(self, _event):
         self._cancel_collapse()
+        if self._dragged or self._pressed_control is not None:
+            return
         self.window.attributes("-alpha", 0.95)
         new_points = get_round_rect_points(*self.hover_coords, self.metrics.radius)
         self.canvas.coords(self.bg_id, *new_points)
         self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline="#81c784")
-        self._expanded = True
+        if not self._expanded:
+            # Resize window to expanded width and slide left
+            right_x = self.window.winfo_x() + self.window.winfo_width()
+            w_expanded = self.metrics.window_width
+            h = self.metrics.height
+            new_x = right_x - w_expanded
+            y = self.window.winfo_y()
+            self.window.geometry(f"{w_expanded}x{h}+{new_x}+{y}")
+            self._expanded = True
         self.canvas.itemconfig(self.btn_pause, state="normal")
         self.canvas.itemconfig(self.btn_close, state="normal")
         self.update_pause_ui()
@@ -801,9 +839,68 @@ class FloatingWidget:
         self._cancel_collapse()
         self._pressed_control = None
         self._dragged = False
+        if self._expanded:
+            # Revert window layout to collapsed state on hide
+            old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
+            self.canvas.coords(self.bg_id, *old_points)
+            self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
+            w_collapsed = scale_px(44, self.scale)
+            h = self.metrics.height
+            right_x = self.window.winfo_x() + self.window.winfo_width()
+            new_x = right_x - w_collapsed
+            y = self.window.winfo_y()
+            self.window.geometry(f"{w_collapsed}x{h}+{new_x}+{y}")
+            self._expanded = False
+            self.canvas.itemconfig(self.btn_pause, state="hidden")
+            self.canvas.itemconfig(self.btn_close, state="hidden")
+            self.canvas.delete("pause_control")
+            self.canvas.delete("close_control")
         if self.window.state() != "withdrawn":
             self.window.withdraw()
 
     def show(self):
         if self.window.state() == "withdrawn":
             self.window.deiconify()
+
+    def _check_and_update_dpi(self):
+        new_scale = get_window_dpi_scale(self.window)
+        if new_scale != self.scale:
+            self.scale = new_scale
+            self.metrics = build_floating_widget_metrics(self.scale)
+            self.normal_coords = self.metrics.collapsed_rect
+            self.hover_coords = self.metrics.expanded_rect
+
+            # Reconfigure canvas dimension
+            self.canvas.configure(
+                width=self.metrics.window_width,
+                height=self.metrics.height
+            )
+
+            # Re-coords background polygon
+            points = get_round_rect_points(
+                *(self.hover_coords if self._expanded else self.normal_coords),
+                self.metrics.radius
+            )
+            self.canvas.coords(self.bg_id, *points)
+            self.canvas.itemconfig(self.bg_id, width=self.metrics.outline_width)
+
+            # Re-coords label and reset scaled font size
+            self.canvas.coords(self.txt_label, self.metrics.label_x, self.metrics.center_y)
+            self.canvas.itemconfig(
+                self.txt_label,
+                font=("Microsoft JhengHei UI", 10, "bold")
+            )
+
+            # Re-coords buttons hitbox
+            self.canvas.coords(self.btn_pause, *self.metrics.pause_box)
+            self.canvas.coords(self.btn_close, *self.metrics.close_box)
+
+            # Repaint controls
+            self.update_pause_ui()
+
+            # Adjust window geometry
+            w = self.metrics.window_width if self._expanded else scale_px(44, self.scale)
+            h = self.metrics.height
+            x = self.window.winfo_x()
+            y = self.window.winfo_y()
+            self.window.geometry(f"{w}x{h}+{x}+{y}")

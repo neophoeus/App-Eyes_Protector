@@ -1,4 +1,5 @@
 import ctypes
+import os
 import subprocess
 import sys
 import tkinter as tk
@@ -235,8 +236,9 @@ def force_close_existing_instance():
         return False
 
     creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    # Exclude the current process PID to let the new instance exit gracefully
     result = subprocess.run(
-        ["taskkill", "/F", "/IM", image_name, "/T"],
+        ["taskkill", "/F", "/FI", f"PID ne {os.getpid()}", "/IM", image_name, "/T"],
         check=False,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

@@ -2,12 +2,16 @@
 setlocal
 pushd "%~dp0"
 
-set "VENV_PYTHON=%~dp0..\.venv\Scripts\python.exe"
+set "VENV_PYTHON=%~dp0.venv\Scripts\python.exe"
+set "PARENT_VENV_PYTHON=%~dp0..\.venv\Scripts\python.exe"
 set "PYTHON_CMD=python"
 
 if exist "%VENV_PYTHON%" (
 	set "PYTHON_CMD=%VENV_PYTHON%"
+) else if exist "%PARENT_VENV_PYTHON%" (
+	set "PYTHON_CMD=%PARENT_VENV_PYTHON%"
 )
+
 
 echo Using Python: %PYTHON_CMD%
 echo Installing/Updating development dependencies...
