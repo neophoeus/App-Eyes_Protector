@@ -8,7 +8,7 @@
 
 A highly lightweight, zero-dependency, immersive eye protection assistant for Windows.
 
-**Latest Release:** v3.0  
+**Latest Release:** v3.1  
 **Release Notes:** See [CHANGELOG.md](CHANGELOG.md)
 
 > **What is the 20-20-20 Rule?**  
@@ -45,6 +45,7 @@ This project has been compiled into a single portable executable using PyInstall
 
 #### Manual Testing and Operation
 
+- **Show CLI Help Instructions**: Run `EyesProtector.exe --help` or `-h` to print detailed option descriptions and exit cleanly.
 - **Test Animation Effects**: You can run `EyesProtector.exe --test` from the terminal to immediately test the 10-second reminder and 5-second break.
 - **Pre-Break Warning & Postpone**: When the warning starts, you can hover over the floating widget in the bottom-right corner and click the canvas-drawn pause control to immediately dismiss the warning and pause protection.
 - **Interrupt Break**: If you urgently need to return to work during a break, click the top-right close chip to end the break early and return to background timing.
@@ -89,7 +90,7 @@ python -m unittest discover -s tests -v
 
 一款極輕量、零依賴的 Windows 沉浸式護眼助理。
 
-**最新版本：** v3.0  
+**最新版本：** v3.1  
 **版本說明：** 請見 [CHANGELOG.md](CHANGELOG.md)
 
 > **什麼是 20-20-20 護眼法則？**  
@@ -126,6 +127,7 @@ python -m unittest discover -s tests -v
 
 #### 手動測試與操作
 
+- **顯示命令列說明**：執行 `EyesProtector.exe --help` 或 `-h` 印出詳細的執行參數說明。
 - **測試動畫效果**：您可以從終端機執行 `EyesProtector.exe --test` 來立即測試 10 秒提醒與 5 秒休息。
 - **預警中斷與暫停**：在預警畫面漸進顯現時，您可以將滑鼠移至懸浮窗點選暫停，以立即收回預警畫面並暫停防護。
 - **中斷休息**：若需緊急回到工作，點擊全螢幕右上角的 close chip 即可提早結束本次休息並退回背景計時。

@@ -2,6 +2,18 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.1 - 2026-07-01
+
+### Added
+
+- **Command Line Help Support**: Added support for `-h` and `--help` CLI flags to print usage instructions directly to standard output and exit safely without initiating GUI components.
+- **App Startup Unit Tests**: Added unit testing suite (`tests/test_app.py`) to verify parameter parsing and successful initializations.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `python main.py --help`
+
 ## v3.0 - 2026-07-01
 
 ### Added
