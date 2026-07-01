@@ -275,3 +275,67 @@ def check_single_instance(root):
                 )
         raise SystemExit(0)
     root.mutex = mutex
+
+
+GWL_EXSTYLE = -20
+WS_EX_TRANSPARENT = 0x20
+WS_EX_LAYERED = 0x80000
+
+
+def set_window_click_through(window):
+    try:
+        hwnd = window.winfo_id()
+        user32 = ctypes.windll.user32
+        
+        user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        user32.GetAncestor.restype = ctypes.c_void_p
+        hwnd_root = user32.GetAncestor(hwnd, 2)  # GA_ROOT = 2
+        if not hwnd_root:
+            hwnd_root = hwnd
+            
+        if hasattr(user32, "GetWindowLongPtrW"):
+            get_long = user32.GetWindowLongPtrW
+            set_long = user32.SetWindowLongPtrW
+        else:
+            get_long = user32.GetWindowLongW
+            set_long = user32.SetWindowLongW
+            
+        get_long.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        get_long.restype = ctypes.c_size_t
+        set_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_size_t]
+        set_long.restype = ctypes.c_size_t
+        
+        style = get_long(hwnd_root, GWL_EXSTYLE)
+        set_long(hwnd_root, GWL_EXSTYLE, style | WS_EX_TRANSPARENT | WS_EX_LAYERED)
+    except Exception:
+        pass
+
+
+def remove_window_click_through(window):
+    try:
+        hwnd = window.winfo_id()
+        user32 = ctypes.windll.user32
+        
+        user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        user32.GetAncestor.restype = ctypes.c_void_p
+        hwnd_root = user32.GetAncestor(hwnd, 2)
+        if not hwnd_root:
+            hwnd_root = hwnd
+            
+        if hasattr(user32, "GetWindowLongPtrW"):
+            get_long = user32.GetWindowLongPtrW
+            set_long = user32.SetWindowLongPtrW
+        else:
+            get_long = user32.GetWindowLongW
+            set_long = user32.SetWindowLongW
+            
+        get_long.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        get_long.restype = ctypes.c_size_t
+        set_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_size_t]
+        set_long.restype = ctypes.c_size_t
+        
+        style = get_long(hwnd_root, GWL_EXSTYLE)
+        set_long(hwnd_root, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT)
+    except Exception:
+        pass
+

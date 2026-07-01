@@ -107,12 +107,23 @@ class FloatingWidgetMetrics:
 class FullScreenLayout:
     timer_x: int
     timer_y: int
+    timer_font_size: int
     guide_x: int
     guide_y: int
     guide_width: int
     close_center_x: int
     close_center_y: int
     close_radius: int
+    card_x1: int
+    card_y1: int
+    card_x2: int
+    card_y2: int
+    card_radius: int
+    ring_x1: int
+    ring_y1: int
+    ring_x2: int
+    ring_y2: int
+    ring_thickness: int
 
 
 def build_reminder_dialog_metrics(scale):
@@ -173,19 +184,63 @@ def build_floating_widget_metrics(scale):
 
 
 def build_fullscreen_layout(screen_width, screen_height, scale):
-    timer_x = screen_width // 2
-    timer_y = (screen_height // 2) - scale_px(56, scale)
-    timer_font_size = max(96, scale_px(168, scale))
-    guide_gap = scale_px(64, scale)
+    # Direct responsive width: 55% of screen width, clamped between 640px and 1920px
+    card_width = int(screen_width * 0.55)
+    card_width = max(640, min(1920, card_width))
+    
+    # 10:7 aspect ratio card height
+    card_height = int(card_width * 0.70)
+    card_radius = int(card_height * 0.08)
+    
+    card_x1 = (screen_width - card_width) // 2
+    card_y1 = (screen_height - card_height) // 2
+    card_x2 = card_x1 + card_width
+    card_y2 = card_y1 + card_height
+    
+    # Proportional ring metrics
+    ring_radius = int(card_height * 0.24)
+    ring_thickness = max(scale_px(8, scale), int(ring_radius * 0.08))
+    
+    ring_center_x = screen_width // 2
+    ring_center_y = card_y1 + int(card_height * 0.40)
+    
+    ring_x1 = ring_center_x - ring_radius
+    ring_y1 = ring_center_y - ring_radius
+    ring_x2 = ring_center_x + ring_radius
+    ring_y2 = ring_center_y + ring_radius
+    
+    timer_x = ring_center_x
+    timer_y = ring_center_y
+    timer_font_size = int(ring_radius * 0.65)
+    
+    # Proportional guide text coordinates
+    guide_x = screen_width // 2
+    guide_y = card_y1 + int(card_height * 0.76)
+    guide_width = card_width - scale_px(80, scale)
+    
     close_radius = scale_px(26, scale)
     close_margin = scale_px(32, scale)
+    close_center_x = screen_width - close_margin - close_radius
+    close_center_y = close_margin + close_radius
+    
     return FullScreenLayout(
         timer_x=timer_x,
         timer_y=timer_y,
-        guide_x=timer_x,
-        guide_y=timer_y + (timer_font_size // 2) + guide_gap,
-        guide_width=min(scale_px(960, scale), int(screen_width * 0.78)),
-        close_center_x=screen_width - close_margin - close_radius,
-        close_center_y=close_margin + close_radius,
+        timer_font_size=timer_font_size,
+        guide_x=guide_x,
+        guide_y=guide_y,
+        guide_width=guide_width,
+        close_center_x=close_center_x,
+        close_center_y=close_center_y,
         close_radius=close_radius,
+        card_x1=card_x1,
+        card_y1=card_y1,
+        card_x2=card_x2,
+        card_y2=card_y2,
+        card_radius=card_radius,
+        ring_x1=ring_x1,
+        ring_y1=ring_y1,
+        ring_x2=ring_x2,
+        ring_y2=ring_y2,
+        ring_thickness=ring_thickness,
     )

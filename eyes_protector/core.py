@@ -2,7 +2,7 @@ from dataclasses import dataclass, replace
 
 
 STATE_RUNNING = "RUNNING"
-STATE_DIALOG_VISIBLE = "DIALOG_VISIBLE"
+STATE_WARNING = "WARNING"
 STATE_BREAKING = "BREAKING"
 BUSY_REASON_NONE = "NONE"
 BUSY_REASON_IDLE = "IDLE"
@@ -22,7 +22,7 @@ class RuntimeState:
 @dataclass(frozen=True)
 class TickResult:
     runtime: RuntimeState
-    should_show_dialog: bool = False
+    should_start_warning: bool = False
 
 
 def create_runtime_state(config):
@@ -57,10 +57,10 @@ def apply_tick(runtime, config, busy_reason=BUSY_REASON_NONE):
             replace(
                 updated,
                 time_elapsed=elapsed,
-                state=STATE_DIALOG_VISIBLE,
-                floating_visible=False,
+                state=STATE_WARNING,
+                floating_visible=True,
             ),
-            should_show_dialog=True,
+            should_start_warning=True,
         )
     return TickResult(replace(updated, time_elapsed=elapsed))
 

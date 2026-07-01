@@ -2,6 +2,35 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.0 - 2026-07-01
+
+### Added
+
+- **Pre-break Fading Warning Overlay**: A non-interactive, click-through full-screen overlay that starts at 5% opacity and fades to 85% opacity over a warning duration (20 seconds), giving you ample time to finish typing or clicking before the break starts.
+- **Click-Through Window Integration**: Added Windows native API support (`WS_EX_TRANSPARENT | WS_EX_LAYERED`) to make the warning window completely pass clicks and keyboard events to underlying applications.
+- **Low-Power Circular Progress Ring**: A clean mint-green circular progress ring drawn on the canvas that ticks at 1Hz (once per second) during warning (filling up) and rest break (draining down).
+- **Forest Dark Mode (森林暗色模式)**: Overhauled the entire visual layout with a sleek forest dark green theme (`#0d130f` background and `#16201a` cards) to minimize screen emission and reduce eye strain.
+- **Fading Pause Control**: The floating widget remains fully visible and interactive during the warning phase, enabling users to click "Pause" to instantly dismiss the warning and pause protection.
+
+### Removed
+
+- The intrusive `CenterReminderDialog` that grabbed focus and interrupted active keyboard typing or mouse clicking.
+
+### Changed
+
+- Re-themed the floating widget with dark translucent forest colors, utilizing mint-green accents for protecting state and amber for paused state.
+- Enclosed the countdown timer and guide text in a beautifully centered container card on the fullscreen break view.
+- Redesigned the full-screen layout to scale responsively based on monitor dimensions, supporting 4K resolutions with grand proportions, matching fonts, and large rounded corners (8% of card height).
+- Upgraded pre-break warning fade-in animation from 1Hz to 10Hz for buttery-smooth transitions.
+- Fixed a Win32 API pointer size truncation issue on 64-bit Windows, ensuring click-through works reliably.
+- Pre-mapped the Toplevel window during initialization to force wrapper handle creation, resolving the click-through race condition on the first warning.
+- Re-aligned and updated the test suite to verify the `STATE_WARNING` transitions and ensure zero regressions.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `python main.py --test`
+
 ## v2.1 - 2026-06-05
 
 ### Added
@@ -100,6 +129,35 @@ All notable changes to App-Eyes Protector are documented here.
 # 版本紀錄
 
 App-Eyes Protector 的重要變更統一記錄於此。
+
+## v3.0 - 2026-07-01
+
+### 新增
+
+- **漸進式無干擾全螢幕預警**：當護眼時間到時，會先以 5% 的不透明度漸漸顯現，並在 20 秒內慢慢加深至 85%。此預警視窗完全「滑鼠穿透」（Click-through）且不搶奪焦點，讓您能不受干擾地完成正在輸入的字句或點選的按鈕。
+- **滑鼠穿透視窗技術**：整合 Windows 原生 API（`WS_EX_TRANSPARENT | WS_EX_LAYERED`），使透明預警畫面可以將所有點擊與按鍵事件傳遞至下方的應用程式。
+- **超低功耗環形進度條**：在卡片中央繪製薄荷綠的環形進度條，僅在每秒計時更新時重繪（1Hz 頻率）。預警時順時針填滿，休息時逆時針消退。
+- **森林暗色模式（Forest Dark Mode）**：全面換上極低功耗且護眼的深森林綠背景（`#0d130f`）與深綠卡片（`#16201a`），降低螢幕亮度與眼部負擔。
+- **預警快速中斷**：預警期間右下角懸浮球依然保持顯示，您可隨時點選「暫停」以立即關閉預警畫面。
+
+### 移除
+
+- 移除原先會突然搶佔焦點與鍵盤輸入、打斷打字點選的中央提醒對話框（`CenterReminderDialog`）。
+
+### 調整
+
+- 將懸浮視窗調整為半透明深綠森林風格，保護中顯示薄荷綠，暫停中顯示溫馨琥珀色。
+- 全螢幕休息畫面中的倒數與護眼指引文字，現在被收納在視覺層次更精美的中央圓角卡片中。
+- 重新設計全螢幕版面為響應式自適應比例，支援 4K 螢幕大尺寸卡片、大圓角（卡片高度 8%）與等比例字型。
+- 將預警畫面的漸變更新頻率從 1Hz 提升至 10Hz，帶來絲滑柔和的動畫效果。
+- 修正 64 位元 Windows 系統下的 Win32 API 指標長度截斷問題，確保滑鼠穿透 100% 穩定生效。
+- 程式啟動時預先映射（Pre-map）全螢幕視窗，強制系統建立外框控制代碼，徹底解決第一次預警時穿透樣式因異步載入而失效的問題。
+- 更新單元測試套件以符合 `STATE_WARNING` 的新流程與懸浮窗狀態。
+
+### 驗證
+
+- 單元測試：`python -m unittest discover -s tests -v`
+- 手動 smoke test：`python main.py --test`
 
 ## v2.1 - 2026-06-05
 

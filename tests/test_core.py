@@ -6,7 +6,7 @@ from eyes_protector.core import (
     BUSY_REASON_IDLE,
     BUSY_REASON_NONE,
     STATE_BREAKING,
-    STATE_DIALOG_VISIBLE,
+    STATE_WARNING,
     STATE_RUNNING,
     apply_finish_break,
     apply_quit,
@@ -25,6 +25,7 @@ TEST_CONFIG = AppConfig(
     poll_interval=1,
     idle_threshold=20,
     fullscreen_transition_ticks=1,
+    warning_duration=5,
 )
 
 
@@ -44,7 +45,7 @@ class CoreStateTests(unittest.TestCase):
 
         self.assertEqual(result.runtime.time_elapsed, 0)
         self.assertFalse(result.runtime.floating_visible)
-        self.assertFalse(result.should_show_dialog)
+        self.assertFalse(result.should_start_warning)
 
     def test_fullscreen_tick_freezes_elapsed_and_hides_widget(self):
         runtime = create_runtime_state(TEST_CONFIG)
@@ -61,7 +62,7 @@ class CoreStateTests(unittest.TestCase):
 
         self.assertEqual(result.runtime.time_elapsed, 7)
         self.assertFalse(result.runtime.floating_visible)
-        self.assertFalse(result.should_show_dialog)
+        self.assertFalse(result.should_start_warning)
 
     def test_paused_tick_keeps_elapsed_unchanged(self):
         runtime = create_runtime_state(TEST_CONFIG)
@@ -79,7 +80,7 @@ class CoreStateTests(unittest.TestCase):
 
         self.assertEqual(result.runtime.time_elapsed, 4)
         self.assertEqual(result.runtime.state, STATE_RUNNING)
-        self.assertFalse(result.should_show_dialog)
+        self.assertFalse(result.should_start_warning)
 
     def test_tick_opens_dialog_when_interval_reached(self):
         runtime = create_runtime_state(TEST_CONFIG)
@@ -94,9 +95,9 @@ class CoreStateTests(unittest.TestCase):
 
         result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_NONE)
 
-        self.assertEqual(result.runtime.state, STATE_DIALOG_VISIBLE)
-        self.assertFalse(result.runtime.floating_visible)
-        self.assertTrue(result.should_show_dialog)
+        self.assertEqual(result.runtime.state, STATE_WARNING)
+        self.assertTrue(result.runtime.floating_visible)
+        self.assertTrue(result.should_start_warning)
 
     def test_resume_from_pause_resets_elapsed(self):
         runtime = create_runtime_state(TEST_CONFIG)

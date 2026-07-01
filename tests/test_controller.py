@@ -6,7 +6,7 @@ from eyes_protector.controller import EyesProtectorController
 from eyes_protector.core import (
     BUSY_REASON_FULLSCREEN,
     BUSY_REASON_NONE,
-    STATE_DIALOG_VISIBLE,
+    STATE_WARNING,
     STATE_RUNNING,
 )
 
@@ -18,6 +18,7 @@ TEST_CONFIG = AppConfig(
     poll_interval=1,
     idle_threshold=20,
     fullscreen_transition_ticks=2,
+    warning_duration=5,
 )
 
 
@@ -83,9 +84,11 @@ class FakeFullscreen:
         self.window = FakeWindow()
         self.show_calls = 0
         self.hide_calls = 0
+        self.last_is_warning = None
 
-    def show(self):
+    def show(self, is_warning=False):
         self.show_calls += 1
+        self.last_is_warning = is_warning
 
     def hide(self):
         self.hide_calls += 1
@@ -94,16 +97,13 @@ class FakeFullscreen:
 class ControllerTests(unittest.TestCase):
     def _build_controller(self):
         root = FakeRoot()
-        dialog_patch = mock.patch(
-            "eyes_protector.controller.CenterReminderDialog", FakeDialog
-        )
         floating_patch = mock.patch(
             "eyes_protector.controller.FloatingWidget", FakeFloating
         )
         fullscreen_patch = mock.patch(
             "eyes_protector.controller.FullScreenBreak", FakeFullscreen
         )
-        patches = [dialog_patch, floating_patch, fullscreen_patch]
+        patches = [floating_patch, fullscreen_patch]
         for patcher in patches:
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -127,7 +127,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(root.after_calls[-1][0], TEST_CONFIG.poll_interval * 1000)
         self.assertIsNotNone(controller._tick_job)
 
-    def test_run_timer_shows_dialog_without_rescheduling_background_tick(self):
+    def test_run_timer_starts_warning_without_rescheduling_background_tick(self):
         root, controller = self._build_controller()
         controller.runtime = controller.runtime.__class__(
             time_elapsed=TEST_CONFIG.break_interval - 1,
@@ -145,8 +145,9 @@ class ControllerTests(unittest.TestCase):
             with mock.patch("eyes_protector.controller.get_idle_time", return_value=0):
                 controller.run_timer()
 
-        self.assertEqual(controller.runtime.state, STATE_DIALOG_VISIBLE)
-        self.assertEqual(controller.dialog.show_calls, 1)
+        self.assertEqual(controller.runtime.state, STATE_WARNING)
+        self.assertEqual(controller.fullscreen.show_calls, 1)
+        self.assertTrue(controller.fullscreen.last_is_warning)
         self.assertIsNone(controller._tick_job)
         self.assertEqual(len(root.after_calls), 1)
 
@@ -183,13 +184,13 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(controller.floating.hide_calls, 1)
         self.assertEqual(controller.floating.show_calls, initial_show_calls + 1)
 
-    def test_snooze_from_dialog_state_reschedules_tick(self):
+    def test_snooze_from_warning_state_reschedules_tick(self):
         root, controller = self._build_controller()
         controller._tick_job = None
         controller.runtime = controller.runtime.__class__(
             time_elapsed=controller.runtime.time_elapsed,
             target_interval=controller.runtime.target_interval,
-            state=STATE_DIALOG_VISIBLE,
+            state=STATE_WARNING,
             paused=controller.runtime.paused,
             floating_visible=False,
             running=controller.runtime.running,
@@ -213,7 +214,7 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(controller.runtime.running)
         self.assertEqual(root.after_cancel_calls, [initial_job])
         self.assertEqual(controller.fullscreen.hide_calls, 1)
-        self.assertEqual(destroy_mock.call_count, 4)
+        self.assertEqual(destroy_mock.call_count, 3)
 
     def test_fullscreen_busy_reason_is_debounced_before_freezing_timer(self):
         root, controller = self._build_controller()

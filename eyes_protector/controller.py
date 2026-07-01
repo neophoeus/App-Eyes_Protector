@@ -3,6 +3,8 @@ from .core import (
     BUSY_REASON_IDLE,
     BUSY_REASON_NONE,
     STATE_RUNNING,
+    STATE_WARNING,
+    STATE_BREAKING,
     apply_finish_break,
     apply_quit,
     apply_snooze,
@@ -12,7 +14,7 @@ from .core import (
     toggle_pause,
 )
 from .platform_utils import get_idle_time, get_platform_busy_reason, safe_destroy_window
-from .ui import CenterReminderDialog, FloatingWidget, FullScreenBreak
+from .ui import FloatingWidget, FullScreenBreak
 
 
 class EyesProtectorController:
@@ -21,7 +23,6 @@ class EyesProtectorController:
         self.config = config
         self.root.withdraw()
         self.runtime = create_runtime_state(config)
-        self.dialog = CenterReminderDialog(self)
         self.fullscreen = FullScreenBreak(self)
         self.floating = FloatingWidget(self)
         self._tick_job = None
@@ -109,7 +110,20 @@ class EyesProtectorController:
         return self._resolve_busy_reason(get_platform_busy_reason())
 
     def toggle_pause(self):
-        self.runtime = toggle_pause(self.runtime)
+        from dataclasses import replace
+        if self.runtime.state in (STATE_WARNING, STATE_BREAKING):
+            self.fullscreen.hide()
+            self.runtime = replace(
+                self.runtime,
+                state=STATE_RUNNING,
+                paused=True,
+                time_elapsed=0,
+                target_interval=self.config.break_interval,
+                floating_visible=True,
+            )
+            self._set_floating_visibility(True)
+        else:
+            self.runtime = toggle_pause(self.runtime)
         self.floating.update_pause_ui()
         self._sync_tick_schedule()
 
@@ -123,8 +137,8 @@ class EyesProtectorController:
         self.runtime = tick_result.runtime
         if previous_visibility != self.runtime.floating_visible:
             self._set_floating_visibility(self.runtime.floating_visible)
-        if tick_result.should_show_dialog:
-            self.dialog.show()
+        if tick_result.should_start_warning:
+            self.start_warning()
         self._sync_tick_schedule()
 
     def snooze(self):
@@ -134,6 +148,19 @@ class EyesProtectorController:
             self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule()
 
+    def start_warning(self):
+        previous_runtime = self.runtime
+        previous_visibility = self.runtime.floating_visible
+        self._set_floating_visibility(self.runtime.floating_visible)
+        self._sync_tick_schedule()
+        try:
+            self.fullscreen.show(is_warning=True)
+        except Exception:
+            self.runtime = previous_runtime
+            self._set_floating_visibility(self.runtime.floating_visible)
+            self._sync_tick_schedule()
+            raise
+
     def start_full_break(self):
         previous_runtime = self.runtime
         previous_visibility = self.runtime.floating_visible
@@ -142,7 +169,7 @@ class EyesProtectorController:
             self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule()
         try:
-            self.fullscreen.show()
+            self.fullscreen.show(is_warning=False)
         except Exception:
             self.runtime = previous_runtime
             self._set_floating_visibility(self.runtime.floating_visible)
@@ -158,7 +185,6 @@ class EyesProtectorController:
 
     def _destroy_windows(self):
         safe_destroy_window(self.floating.window)
-        safe_destroy_window(self.dialog.window)
         safe_destroy_window(self.fullscreen.window)
         safe_destroy_window(self.root)
 
@@ -169,7 +195,6 @@ class EyesProtectorController:
         self.runtime = apply_quit(self.runtime)
         self._cancel_tick()
         self.fullscreen.hide()
-        self.dialog.hide()
         self.floating.hide()
         after_idle = getattr(self.root, "after_idle", None)
         if after_idle is None:

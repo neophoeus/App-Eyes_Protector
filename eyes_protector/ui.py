@@ -1,10 +1,16 @@
 import tkinter as tk
+import time
+import math
 
-from .platform_utils import get_window_dpi_scale, safe_play_sound
+from .platform_utils import (
+    get_window_dpi_scale,
+    safe_play_sound,
+    set_window_click_through,
+    remove_window_click_through,
+)
 from .ui_metrics import (
     build_floating_widget_metrics,
     build_fullscreen_layout,
-    build_reminder_dialog_metrics,
     center_window_position,
     get_round_rect_points,
     scale_px,
@@ -16,6 +22,22 @@ FULLSCREEN_COPY = {
     "complete": "休息完成，慢慢回到工作",
     "skipped": "已返回工作，稍後會再提醒。",
 }
+
+# Forest Dark Mode Theme Colors
+COLOR_SCREEN_BG = "#0d130f"
+COLOR_CARD_BG = "#16201a"
+COLOR_CARD_BORDER = "#28382e"
+COLOR_TEXT_PRIMARY = "#e6f4ea"
+COLOR_MINT_ACCENT = "#5cdb95"
+COLOR_AMBER_WARNING = "#f39c12"
+COLOR_RED_CLOSE = "#e74c3c"
+COLOR_CLOSE_HOVER = "#243b2f"
+
+COLOR_FLOATING_BG_NORMAL = "#16201a"
+COLOR_FLOATING_BG_HOVER = "#1e2b23"
+COLOR_FLOATING_BORDER_NORMAL = "#28382e"
+COLOR_FLOATING_BORDER_HOVER = "#5cdb95"
+
 
 
 def _expand_box(box, delta):
@@ -29,117 +51,14 @@ def _relative_point(box, x_ratio, y_ratio):
     return (x1 + (width * x_ratio), y1 + (height * y_ratio))
 
 
-class CenterReminderDialog:
-    def __init__(self, controller):
-        self.controller = controller
-        self.window = tk.Toplevel(controller.root)
-        self.window.withdraw()
-        self.window.overrideredirect(True)
-        self.window.attributes("-topmost", True)
-        self.window.configure(bg="#ffffff")
-        self.scale = get_window_dpi_scale(self.window)
-        self.metrics = build_reminder_dialog_metrics(self.scale)
-        title_font = ("Microsoft JhengHei UI", 18, "bold")
-        sub_font = ("Microsoft JhengHei UI", 12)
-        btn_font = ("Microsoft JhengHei UI", 11, "bold")
-        frame = tk.Frame(
-            self.window,
-            bg="#ffffff",
-            highlightbackground="#e0e0e0",
-            highlightthickness=self.metrics.border_width,
-        )
-        frame.pack(fill=tk.BOTH, expand=True)
-        lbl_title = tk.Label(
-            frame, text="護眼時間到了", font=title_font, fg="#2c3e50", bg="#ffffff"
-        )
-        lbl_title.pack(pady=(self.metrics.title_top_pad, self.metrics.title_bottom_pad))
-        lbl_msg = tk.Label(
-            frame,
-            text="您已經連續盯著螢幕一段時間了。\n給眼睛幾秒鐘，跟我一起深呼吸吧！",
-            font=sub_font,
-            fg="#7f8c8d",
-            bg="#ffffff",
-            justify=tk.CENTER,
-        )
-        lbl_msg.pack(
-            padx=self.metrics.message_pad_x,
-            pady=(0, self.metrics.message_bottom_pad),
-        )
-        btn_frame = tk.Frame(frame, bg="#ffffff")
-        btn_frame.pack(
-            fill=tk.X,
-            padx=self.metrics.button_pad_x,
-            pady=(0, self.metrics.button_bottom_pad),
-        )
-        btn_rest = tk.Button(
-            btn_frame,
-            text="開始放鬆 (20秒)  Enter",
-            font=btn_font,
-            bg="#27ae60",
-            fg="white",
-            relief=tk.FLAT,
-            cursor="hand2",
-            command=self.on_rest,
-            activebackground="#2ecc71",
-            pady=self.metrics.primary_button_pad_y,
-        )
-        btn_rest.pack(
-            side=tk.TOP,
-            expand=True,
-            fill=tk.X,
-            pady=(0, self.metrics.primary_button_spacing),
-        )
-        btn_snooze = tk.Button(
-            btn_frame,
-            text="稍後提醒 (5分鐘)  Esc",
-            font=("Microsoft JhengHei UI", 10),
-            bg="#ffffff",
-            fg="#95a5a6",
-            relief=tk.FLAT,
-            cursor="hand2",
-            command=self.on_snooze,
-            activebackground="#f5f6fa",
-            activeforeground="#7f8c8d",
-            pady=self.metrics.secondary_button_pad_y,
-        )
-        btn_snooze.pack(side=tk.TOP, expand=True, fill=tk.X)
-        self.window.bind("<Return>", lambda e: self.on_rest())
-        self.window.bind("<Escape>", lambda e: self.on_snooze())
-
-    def show(self):
-        self.scale = get_window_dpi_scale(self.window)
-        self.metrics = build_reminder_dialog_metrics(self.scale)
-        w, h = self.metrics.width, self.metrics.height
-        sw = self.window.winfo_screenwidth()
-        sh = self.window.winfo_screenheight()
-        x, y = center_window_position(sw, sh, w, h)
-        self.window.geometry(f"{w}x{h}+{x}+{y}")
-        self.window.deiconify()
-        self.window.focus_force()
-        safe_play_sound("SystemAsterisk")
-
-    def hide(self):
-        self.window.withdraw()
-
-    def on_rest(self):
-        self.hide()
-        self.controller.start_full_break()
-
-    def on_snooze(self):
-        self.hide()
-        self.controller.snooze()
-
-
 class FullScreenBreak:
     def __init__(self, controller):
         self.controller = controller
         self.window = tk.Toplevel(controller.root)
-        self.window.withdraw()
         self.window.attributes("-topmost", True)
         self.window.attributes("-fullscreen", True)
-        self.bg_color = "#6f8661"
-        self.guide_color = "#dbe7b2"
-        self.close_hover_color = "#8ea283"
+        self.bg_color = COLOR_SCREEN_BG
+        self.close_hover_color = COLOR_CLOSE_HOVER
         self.window.configure(bg=self.bg_color)
         self.canvas = tk.Canvas(self.window, bg=self.bg_color, highlightthickness=0)
         self.canvas.place(x=0, y=0, relwidth=1, relheight=1)
@@ -148,6 +67,12 @@ class FullScreenBreak:
         self._session_id = 0
         self.scale = 1.0
         self.layout = None
+
+        # Pre-map the window at startup to fully initialize root HWND wrapper structures,
+        # then immediately withdraw it so it is hidden from the user.
+        self.window.deiconify()
+        self.window.update()
+        self.window.withdraw()
 
     def _refresh_layout(self):
         self.scale = get_window_dpi_scale(self.window)
@@ -163,72 +88,105 @@ class FullScreenBreak:
             fill=self.close_hover_color,
             outline="",
         )
-        self.canvas.itemconfig("close_chip_icon", fill="#ffffff")
 
     def init_geometry(self):
         self.canvas.delete("all")
         sw, sh = self._refresh_layout()
         layout = self.layout
-        timer_font_size = max(96, scale_px(168, self.scale))
-        guide_font_size = max(18, scale_px(18, self.scale))
-        guide_gap = max(scale_px(56, self.scale), timer_font_size // 3)
+        card_h = layout.card_y2 - layout.card_y1
+        guide_font_size = max(14, int(card_h * 0.032))
         close_stroke_width = max(2, scale_px(2.5, self.scale))
         close_icon_inset = max(scale_px(11, self.scale), layout.close_radius // 2)
         close_x1 = layout.close_center_x - layout.close_radius
         close_y1 = layout.close_center_y - layout.close_radius
         close_x2 = layout.close_center_x + layout.close_radius
         close_y2 = layout.close_center_y + layout.close_radius
+        
         self.window.configure(bg=self.bg_color)
         self.canvas.configure(bg=self.bg_color)
         self.canvas.create_rectangle(0, 0, sw, sh, fill=self.bg_color, outline="")
-        timer_probe_id = self.canvas.create_text(
-            layout.timer_x,
-            layout.timer_y,
-            text="00",
-            font=("Segoe UI", timer_font_size, "bold"),
-            fill=self.bg_color,
-            justify=tk.CENTER,
+        
+        # Centered rounded card
+        card_points = get_round_rect_points(
+            layout.card_x1,
+            layout.card_y1,
+            layout.card_x2,
+            layout.card_y2,
+            layout.card_radius,
         )
-        timer_bbox = self.canvas.bbox(timer_probe_id)
-        self.canvas.delete(timer_probe_id)
-        guide_y = layout.guide_y
-        if timer_bbox is not None:
-            guide_y = timer_bbox[3] + guide_gap
+        self.canvas.create_polygon(
+            card_points,
+            fill=COLOR_CARD_BG,
+            outline=COLOR_CARD_BORDER,
+            width=max(1, scale_px(1.5, self.scale)),
+            smooth=True,
+        )
+        
+        # Static background circle track
+        self.canvas.create_oval(
+            layout.ring_x1,
+            layout.ring_y1,
+            layout.ring_x2,
+            layout.ring_y2,
+            outline="#1d2e24",
+            width=layout.ring_thickness,
+        )
+        
+        # Active progress arc
+        self.active_arc_id = self.canvas.create_arc(
+            layout.ring_x1,
+            layout.ring_y1,
+            layout.ring_x2,
+            layout.ring_y2,
+            start=90,
+            extent=360,
+            style=tk.ARC,
+            outline=COLOR_MINT_ACCENT,
+            width=layout.ring_thickness,
+        )
+        
+        # Countdown text
         self.txt_timer = self.canvas.create_text(
             layout.timer_x,
             layout.timer_y,
             text="",
-            font=("Segoe UI", timer_font_size, "bold"),
-            fill="#ffffff",
+            font=("Segoe UI", layout.timer_font_size, "bold"),
+            fill=COLOR_TEXT_PRIMARY,
             justify=tk.CENTER,
         )
+        
+        # Guide text
         self.guide_text_id = self.canvas.create_text(
             layout.guide_x,
-            guide_y,
+            layout.guide_y,
             text="",
             font=("Microsoft JhengHei UI", guide_font_size, "bold"),
-            fill=self.guide_color,
+            fill=COLOR_MINT_ACCENT,
             anchor="n",
             justify=tk.CENTER,
             width=layout.guide_width,
         )
+        
+        # Close chip hover background
         self.close_chip_bg_id = self.canvas.create_oval(
             close_x1,
             close_y1,
             close_x2,
             close_y2,
-            fill=self.guide_color,
+            fill=self.close_hover_color,
             outline="",
             width=0,
             state="hidden",
             tags="close_chip",
         )
+        
+        # Close chip icon lines (X)
         self.canvas.create_line(
             close_x1 + close_icon_inset,
             close_y1 + close_icon_inset,
             close_x2 - close_icon_inset,
             close_y2 - close_icon_inset,
-            fill="#ffffff",
+            fill=COLOR_RED_CLOSE,
             width=close_stroke_width,
             capstyle=tk.ROUND,
             tags=("close_chip", "close_chip_icon"),
@@ -238,11 +196,12 @@ class FullScreenBreak:
             close_y1 + close_icon_inset,
             close_x1 + close_icon_inset,
             close_y2 - close_icon_inset,
-            fill="#ffffff",
+            fill=COLOR_RED_CLOSE,
             width=close_stroke_width,
             capstyle=tk.ROUND,
             tags=("close_chip", "close_chip_icon"),
         )
+        
         self.canvas.tag_bind(
             "close_chip", "<ButtonRelease-1>", lambda e: self.finish_early()
         )
@@ -256,7 +215,7 @@ class FullScreenBreak:
             "<Leave>",
             lambda e: self._set_close_chip_hover(False),
         )
-        self._apply_break_copy("countdown")
+        
         self.canvas.tag_raise(self.txt_timer)
         self.canvas.tag_raise(self.guide_text_id)
         self.canvas.tag_raise(self.close_chip_bg_id)
@@ -273,17 +232,34 @@ class FullScreenBreak:
                 pass
             setattr(self, job_name, None)
 
-    def show(self):
+    def show(self, is_warning=False):
         self._session_id += 1
         self._cancel_jobs()
-        self.window.withdraw()
-        self.window.update_idletasks()
         self.init_geometry()
         session_id = self._session_id
-        self.window.deiconify()
-        self.window.focus_force()
-        self.window.attributes("-topmost", True)
-        self._countdown_step(self.controller.config.break_duration, session_id)
+        if is_warning:
+            self.window.deiconify()
+            self.window.update()  # Force drawing and window mapping
+            set_window_click_through(self.window)
+            self.window.attributes("-alpha", 0.15)
+            self.canvas.itemconfig("close_chip", state="hidden")
+            
+            # Re-apply click-through after 50ms to ensure the OS wrapper window handles are fully linked
+            self.window.after(50, lambda: set_window_click_through(self.window))
+            
+            # Record warning start time and kick off smooth 10Hz update job
+            self._warning_start_time = time.time()
+            self._warning_step(session_id)
+        else:
+            self.window.deiconify()
+            self.window.update()  # Force drawing and window mapping
+            remove_window_click_through(self.window)
+            self.window.attributes("-alpha", 0.95)
+            self.canvas.itemconfig("close_chip", state="normal")
+            self.canvas.itemconfig(self.close_chip_bg_id, state="hidden")
+            self.window.focus_force()
+            self.window.attributes("-topmost", True)
+            self._countdown_step(self.controller.config.break_duration, session_id)
 
     def hide(self):
         self._session_id += 1
@@ -293,19 +269,55 @@ class FullScreenBreak:
     def _apply_break_copy(self, state_name):
         self.canvas.itemconfig(self.guide_text_id, text=FULLSCREEN_COPY[state_name])
 
+    def _warning_step(self, session_id):
+        if session_id != self._session_id:
+            return
+        total_dur = self.controller.config.warning_duration
+        elapsed = time.time() - self._warning_start_time
+        
+        if elapsed < total_dur:
+            # Smoothly transition alpha from 0.15 to 0.85
+            current_alpha = 0.15 + 0.70 * (elapsed / total_dur)
+            self.window.attributes("-alpha", current_alpha)
+            
+            # Clockwise filling active arc
+            extent = -360 * (elapsed / total_dur)
+            self.canvas.itemconfig(self.active_arc_id, extent=extent, outline=COLOR_AMBER_WARNING)
+            
+            # Display ceiling rounded integer remaining seconds
+            remaining = int(math.ceil(total_dur - elapsed))
+            warning_text = f"休息即將開始 (還有 {remaining} 秒)\n您可以點選右下角懸浮球暫停"
+            self.canvas.itemconfig(self.guide_text_id, text=warning_text, fill=COLOR_AMBER_WARNING)
+            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
+            self.canvas.itemconfig("close_chip", state="hidden")
+            
+            # Re-schedule after 100ms (10Hz) for buttery-smooth transition
+            self._countdown_job = self.window.after(
+                100, self._warning_step, session_id
+            )
+            return
+        self._countdown_job = None
+        self.controller.start_full_break()
+
     def _countdown_step(self, remaining, session_id):
         if session_id != self._session_id:
             return
         if remaining > 0:
+            total_dur = self.controller.config.break_duration
+            extent = -360 * (remaining / total_dur)
+            self.canvas.itemconfig(self.active_arc_id, extent=extent, outline=COLOR_MINT_ACCENT)
+            
             self._apply_break_copy("countdown")
-            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}")
+            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_TEXT_PRIMARY)
+            self.canvas.itemconfig(self.guide_text_id, fill=COLOR_MINT_ACCENT)
             self._countdown_job = self.window.after(
                 1000, self._countdown_step, remaining - 1, session_id
             )
             return
         self._countdown_job = None
         self._apply_break_copy("complete")
-        self.canvas.itemconfig(self.txt_timer, text="00")
+        self.canvas.itemconfig(self.txt_timer, text="00", fill=COLOR_MINT_ACCENT)
+        self.canvas.itemconfig(self.active_arc_id, extent=0)
         safe_play_sound("SystemAsterisk")
         self._finish_job = self.window.after(2000, self.finish)
 
@@ -315,6 +327,7 @@ class FullScreenBreak:
         self._cancel_jobs()
         self._apply_break_copy("skipped")
         self.canvas.itemconfig(self.txt_timer, text="")
+        self.canvas.itemconfig(self.active_arc_id, extent=0)
         safe_play_sound("SystemAsterisk")
         self._finish_job = self.window.after(1000, self.finish)
 
@@ -330,9 +343,9 @@ class FloatingWidget:
         self.window.attributes("-topmost", True)
         self.window.overrideredirect(True)
         self.window.attributes("-transparentcolor", "#000000")
-        self.window.attributes("-alpha", 0.6)
-        self.bg_color_normal = "#e8f5e9"
-        self.bg_color_hover = "#ffffff"
+        self.window.attributes("-alpha", 0.75)
+        self.bg_color_normal = COLOR_FLOATING_BG_NORMAL
+        self.bg_color_hover = COLOR_FLOATING_BG_HOVER
         self.scale = get_window_dpi_scale(self.window)
         self.metrics = build_floating_widget_metrics(self.scale)
         self.canvas = tk.Canvas(
@@ -350,7 +363,7 @@ class FloatingWidget:
             points,
             smooth=True,
             fill=self.bg_color_normal,
-            outline="#a5d6a7",
+            outline=COLOR_FLOATING_BORDER_NORMAL,
             width=self.metrics.outline_width,
         )
         self.txt_label = self.canvas.create_text(
@@ -359,7 +372,7 @@ class FloatingWidget:
             text="",
             anchor="w",
             font=("Microsoft JhengHei UI", 10, "bold"),
-            fill="#27ae60",
+            fill=COLOR_MINT_ACCENT,
         )
         self.btn_pause = self.canvas.create_rectangle(
             *self.metrics.pause_box,
@@ -474,9 +487,9 @@ class FloatingWidget:
         if self._dragged or self._pressed_control is not None:
             return
         old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
-        self.window.attributes("-alpha", 0.6)
+        self.window.attributes("-alpha", 0.75)
         self.canvas.coords(self.bg_id, *old_points)
-        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
+        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL)
         if self._expanded:
             # Resize window to collapsed width and slide right
             right_x = self.window.winfo_x() + self.window.winfo_width()
@@ -514,14 +527,14 @@ class FloatingWidget:
             self.canvas.create_line(
                 *upper,
                 smooth=True,
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 tags="icon_parts",
             )
             self.canvas.create_line(
                 *lower,
                 smooth=True,
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 tags="icon_parts",
             )
@@ -530,7 +543,7 @@ class FloatingWidget:
             self.canvas.create_oval(
                 *pupil_top_left,
                 *pupil_bottom_right,
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 outline="",
                 tags="icon_parts",
             )
@@ -539,14 +552,14 @@ class FloatingWidget:
             self.canvas.create_oval(
                 *highlight_top_left,
                 *highlight_bottom_right,
-                fill="#ffffff",
+                fill=COLOR_SCREEN_BG,
                 outline="",
                 tags="icon_parts",
             )
             self.canvas.create_line(
                 *_relative_point(box, 0.25, 0.46),
                 *_relative_point(box, 0.17, 0.36),
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -554,7 +567,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.35, 0.40),
                 *_relative_point(box, 0.29, 0.28),
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -562,7 +575,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.50, 0.37),
                 *_relative_point(box, 0.50, 0.23),
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -570,7 +583,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.65, 0.40),
                 *_relative_point(box, 0.71, 0.28),
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -578,7 +591,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.75, 0.46),
                 *_relative_point(box, 0.83, 0.36),
-                fill="#2c3e50",
+                fill=COLOR_MINT_ACCENT,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -589,14 +602,14 @@ class FloatingWidget:
                 *_relative_point(box, 0.50, 0.72),
                 *_relative_point(box, 0.85, 0.42),
                 smooth=True,
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 tags="icon_parts",
             )
             self.canvas.create_line(
                 *_relative_point(box, 0.25, 0.48),
                 *_relative_point(box, 0.17, 0.56),
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -604,7 +617,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.35, 0.54),
                 *_relative_point(box, 0.29, 0.66),
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -612,7 +625,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.50, 0.56),
                 *_relative_point(box, 0.50, 0.70),
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -620,7 +633,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.65, 0.54),
                 *_relative_point(box, 0.71, 0.66),
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -628,7 +641,7 @@ class FloatingWidget:
             self.canvas.create_line(
                 *_relative_point(box, 0.75, 0.48),
                 *_relative_point(box, 0.83, 0.56),
-                fill="#f39c12",
+                fill=COLOR_AMBER_WARNING,
                 width=stroke,
                 capstyle=tk.ROUND,
                 tags="icon_parts",
@@ -654,8 +667,8 @@ class FloatingWidget:
             return
         box = self.metrics.pause_box
         paused = getattr(self.controller, "paused", False)
-        accent = "#2ecc71" if paused else "#f39c12"
-        fill_color = "#f2fcf5" if self._pause_hovered else "#ffffff"
+        accent = COLOR_MINT_ACCENT if paused else COLOR_AMBER_WARNING
+        fill_color = "#1e2e24" if self._pause_hovered else COLOR_CARD_BG
         self.canvas.create_oval(
             *box,
             fill=fill_color,
@@ -706,7 +719,7 @@ class FloatingWidget:
         if not self._expanded:
             return
         box = self.metrics.close_box
-        fill_color = "#fff0f0" if self._close_hovered else "#ffffff"
+        fill_color = "#2e1e1e" if self._close_hovered else COLOR_CARD_BG
         self.canvas.create_oval(
             *box,
             fill=fill_color,
@@ -718,7 +731,7 @@ class FloatingWidget:
         self.canvas.create_line(
             *_relative_point(box, 0.35, 0.35),
             *_relative_point(box, 0.65, 0.65),
-            fill="#e74c3c",
+            fill=COLOR_RED_CLOSE,
             width=stroke,
             capstyle=tk.ROUND,
             tags="close_control",
@@ -726,7 +739,7 @@ class FloatingWidget:
         self.canvas.create_line(
             *_relative_point(box, 0.65, 0.35),
             *_relative_point(box, 0.35, 0.65),
-            fill="#e74c3c",
+            fill=COLOR_RED_CLOSE,
             width=stroke,
             capstyle=tk.ROUND,
             tags="close_control",
@@ -736,14 +749,14 @@ class FloatingWidget:
         if getattr(self.controller, "paused", False):
             self._draw_eye("closed")
             if self._expanded:
-                self.canvas.itemconfig(self.txt_label, text="已暫停", fill="#f39c12")
+                self.canvas.itemconfig(self.txt_label, text="已暫停", fill=COLOR_AMBER_WARNING)
             self._draw_pause_control()
             self._draw_close_control()
             self._raise_control_hitboxes()
             return
         self._draw_eye("open")
         if self._expanded:
-            self.canvas.itemconfig(self.txt_label, text="保護中", fill="#27ae60")
+            self.canvas.itemconfig(self.txt_label, text="保護中", fill=COLOR_MINT_ACCENT)
         self._draw_pause_control()
         self._draw_close_control()
         self._raise_control_hitboxes()
@@ -812,7 +825,7 @@ class FloatingWidget:
         self.window.attributes("-alpha", 0.95)
         new_points = get_round_rect_points(*self.hover_coords, self.metrics.radius)
         self.canvas.coords(self.bg_id, *new_points)
-        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline="#81c784")
+        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline=COLOR_FLOATING_BORDER_HOVER)
         if not self._expanded:
             # Resize window to expanded width and slide left
             right_x = self.window.winfo_x() + self.window.winfo_width()
@@ -843,7 +856,7 @@ class FloatingWidget:
             # Revert window layout to collapsed state on hide
             old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
             self.canvas.coords(self.bg_id, *old_points)
-            self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline="#a5d6a7")
+            self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL)
             w_collapsed = scale_px(44, self.scale)
             h = self.metrics.height
             right_x = self.window.winfo_x() + self.window.winfo_width()
