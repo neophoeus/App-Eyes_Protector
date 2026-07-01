@@ -253,6 +253,17 @@ class ControllerTests(unittest.TestCase):
                 self.assertEqual(controller.runtime.time_elapsed, 6)
                 self.assertTrue(controller.runtime.floating_visible)
 
+    def test_idle_state_polling_rate_deceleration(self):
+        root, controller = self._build_controller()
+        from eyes_protector.core import BUSY_REASON_IDLE
+        controller._effective_busy_reason = BUSY_REASON_IDLE
+        
+        controller._cancel_tick()
+        root.after_calls.clear()
+        
+        controller._sync_tick_schedule()
+        self.assertEqual(root.after_calls[0][0], 5000)
+
 
 if __name__ == "__main__":
     unittest.main()

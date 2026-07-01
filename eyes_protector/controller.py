@@ -60,7 +60,13 @@ class EyesProtectorController:
     def _schedule_tick(self, delay_ms=None):
         if not self._should_schedule_tick() or self._tick_job is not None:
             return
-        delay = self.config.poll_interval * 1000 if delay_ms is None else delay_ms
+        if delay_ms is None:
+            if self._effective_busy_reason == BUSY_REASON_IDLE:
+                delay = 5000
+            else:
+                delay = self.config.poll_interval * 1000
+        else:
+            delay = delay_ms
         self._tick_job = self.root.after(delay, self.run_timer)
 
     def _sync_tick_schedule(self, delay_ms=None):

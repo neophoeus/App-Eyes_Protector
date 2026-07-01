@@ -8,7 +8,7 @@
 
 A highly lightweight, zero-dependency, immersive eye protection assistant for Windows.
 
-**Latest Release:** v3.1  
+**Latest Release:** v3.2  
 **Release Notes:** See [CHANGELOG.md](CHANGELOG.md)
 
 > **What is the 20-20-20 Rule?**  
@@ -90,7 +90,7 @@ python -m unittest discover -s tests -v
 
 一款極輕量、零依賴的 Windows 沉浸式護眼助理。
 
-**最新版本：** v3.1  
+**最新版本：** v3.2  
 **版本說明：** 請見 [CHANGELOG.md](CHANGELOG.md)
 
 > **什麼是 20-20-20 護眼法則？**  

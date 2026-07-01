@@ -238,6 +238,8 @@ class FullScreenBreak:
         self.init_geometry()
         session_id = self._session_id
         if is_warning:
+            self._last_warning_remaining = None
+            self._last_warning_alpha = 0.15
             self.window.deiconify()
             self.window.update()  # Force drawing and window mapping
             set_window_click_through(self.window)
@@ -247,7 +249,7 @@ class FullScreenBreak:
             # Re-apply click-through after 50ms to ensure the OS wrapper window handles are fully linked
             self.window.after(50, lambda: set_window_click_through(self.window))
             
-            # Record warning start time and kick off smooth 10Hz update job
+            # Record warning start time and kick off smooth 5Hz update job
             self._warning_start_time = time.time()
             self._warning_step(session_id)
         else:
@@ -278,22 +280,26 @@ class FullScreenBreak:
         if elapsed < total_dur:
             # Smoothly transition alpha from 0.15 to 0.85
             current_alpha = 0.15 + 0.70 * (elapsed / total_dur)
-            self.window.attributes("-alpha", current_alpha)
+            # Only update window alpha if it differs significantly (>= 0.035) or it's the first frame
+            if self._last_warning_alpha is None or abs(current_alpha - self._last_warning_alpha) >= 0.035:
+                self.window.attributes("-alpha", current_alpha)
+                self._last_warning_alpha = current_alpha
             
             # Clockwise filling active arc
             extent = -360 * (elapsed / total_dur)
             self.canvas.itemconfig(self.active_arc_id, extent=extent, outline=COLOR_AMBER_WARNING)
             
-            # Display ceiling rounded integer remaining seconds
+            # Display ceiling rounded integer remaining seconds, only update text when it actually changes
             remaining = int(math.ceil(total_dur - elapsed))
-            warning_text = f"休息即將開始 (還有 {remaining} 秒)\n您可以點選右下角懸浮球暫停"
-            self.canvas.itemconfig(self.guide_text_id, text=warning_text, fill=COLOR_AMBER_WARNING)
-            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
-            self.canvas.itemconfig("close_chip", state="hidden")
+            if remaining != self._last_warning_remaining:
+                warning_text = f"休息即將開始 (還有 {remaining} 秒)\n您可以點選右下角懸浮球暫停"
+                self.canvas.itemconfig(self.guide_text_id, text=warning_text, fill=COLOR_AMBER_WARNING)
+                self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
+                self._last_warning_remaining = remaining
             
-            # Re-schedule after 100ms (10Hz) for buttery-smooth transition
+            # Re-schedule after 200ms (5Hz) for buttery-smooth transition with low overhead
             self._countdown_job = self.window.after(
-                100, self._warning_step, session_id
+                200, self._warning_step, session_id
             )
             return
         self._countdown_job = None

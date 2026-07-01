@@ -2,6 +2,20 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.2 - 2026-07-01
+
+### Optimized
+
+- **Warning Fading Optimization**: Throttled warning screen opacity updates to 2Hz, reducing Desktop Window Manager (DWM) composition/blending workload, and adjusted the warning timer tick rate to 5Hz.
+- **Canvas Rendering Optimization**: Throttled text updates so that the countdown timer digits and warning guide text are refreshed only when the remaining seconds value changes (1Hz).
+- **Idle Polling Optimization**: Dynamically decreased background polling rate from 1s to 5s when the user is idle, significantly minimizing CPU wakeups when the user is away from the computer.
+- **Unit Tests**: Added `test_idle_state_polling_rate_deceleration` to verify the idle polling deceleration behavior.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `python main.py --test`
+
 ## v3.1 - 2026-07-01
 
 ### Added
