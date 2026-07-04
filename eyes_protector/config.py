@@ -30,5 +30,5 @@ def load_config(argv):
         poll_interval=1,
         idle_threshold=300,
         fullscreen_transition_ticks=2,
-        warning_duration=20,
+        warning_duration=10,
     )

@@ -191,6 +191,8 @@ class EyesProtectorController:
 
     def _destroy_windows(self):
         safe_destroy_window(self.floating.window)
+        if hasattr(self.fullscreen, "warning_window"):
+            safe_destroy_window(self.fullscreen.warning_window)
         safe_destroy_window(self.fullscreen.window)
         safe_destroy_window(self.root)
 

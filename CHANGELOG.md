@@ -2,6 +2,25 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.3 - 2026-07-04
+
+### Added
+
+- **Top Warning Countdown Pill**: Implemented a separate top warning window with 100% solid opacity containing a styled pill-shaped card (thick bright mint-green outline, deep green background, and white text) for a clearer, non-intrusive countdown experience.
+- **Redesigned Break Screen**: Overhauled the fullscreen break experience to use a completely solid background (1.0 alpha) and removed the central card to render a spacious, minimalist layout with centered elements.
+- **Pixel-based Font Sizing**: Configured text elements to use absolute pixel sizes (negative integers) to bypass Windows double-scaling bugs and prevent text clipping on high-DPI displays.
+- **Bilingual Documentation**: Separated README documentation into Traditional Chinese (`README.md`) and English (`README.en.md`) versions.
+
+### Changed
+
+- **Warning Duration**: Reduced default production warning countdown duration from 20 seconds to 10 seconds.
+- **Warning Opacity Transition**: Adjusted the main warning overlay to fade from 0.0 to 0.50 opacity instead of 0.15 to 0.85.
+
+### Verification
+
+- Unit tests: `python -m unittest discover -s tests -v`
+- Manual smoke test: `python main.py --test`
+
 ## v3.2 - 2026-07-01
 
 ### Optimized

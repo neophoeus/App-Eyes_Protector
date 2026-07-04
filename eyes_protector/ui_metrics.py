@@ -184,25 +184,13 @@ def build_floating_widget_metrics(scale):
 
 
 def build_fullscreen_layout(screen_width, screen_height, scale):
-    # Direct responsive width: 55% of screen width, clamped between 640px and 1920px
-    card_width = int(screen_width * 0.55)
-    card_width = max(640, min(1920, card_width))
-    
-    # 10:7 aspect ratio card height
-    card_height = int(card_width * 0.70)
-    card_radius = int(card_height * 0.08)
-    
-    card_x1 = (screen_width - card_width) // 2
-    card_y1 = (screen_height - card_height) // 2
-    card_x2 = card_x1 + card_width
-    card_y2 = card_y1 + card_height
-    
-    # Proportional ring metrics
-    ring_radius = int(card_height * 0.24)
+    # Proportional ring metrics based directly on screen dimensions
+    # For a full-screen layout, a radius of 18% of screen height is beautiful and clear
+    ring_radius = max(scale_px(120, scale), int(screen_height * 0.18))
     ring_thickness = max(scale_px(8, scale), int(ring_radius * 0.08))
     
     ring_center_x = screen_width // 2
-    ring_center_y = card_y1 + int(card_height * 0.40)
+    ring_center_y = screen_height // 2
     
     ring_x1 = ring_center_x - ring_radius
     ring_y1 = ring_center_y - ring_radius
@@ -211,17 +199,24 @@ def build_fullscreen_layout(screen_width, screen_height, scale):
     
     timer_x = ring_center_x
     timer_y = ring_center_y
-    timer_font_size = int(ring_radius * 0.65)
+    timer_font_size = int(ring_radius * 0.60)
     
-    # Proportional guide text coordinates
+    # Proportional guide text coordinates - positioned elegantly below the ring
     guide_x = screen_width // 2
-    guide_y = card_y1 + int(card_height * 0.76)
-    guide_width = card_width - scale_px(80, scale)
+    guide_y = ring_center_y + ring_radius + scale_px(60, scale)
+    guide_width = int(screen_width * 0.8)
     
-    close_radius = scale_px(26, scale)
-    close_margin = scale_px(32, scale)
+    close_radius = scale_px(24, scale)
+    close_margin = scale_px(40, scale)
     close_center_x = screen_width - close_margin - close_radius
     close_center_y = close_margin + close_radius
+    
+    # Keep card coordinates for compatibility/mock checks, but based on screen dimensions
+    card_x1 = (screen_width - int(screen_width * 0.6)) // 2
+    card_y1 = (screen_height - int(screen_height * 0.6)) // 2
+    card_x2 = card_x1 + int(screen_width * 0.6)
+    card_y2 = card_y1 + int(screen_height * 0.6)
+    card_radius = int((card_y2 - card_y1) * 0.08)
     
     return FullScreenLayout(
         timer_x=timer_x,

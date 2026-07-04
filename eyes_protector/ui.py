@@ -68,11 +68,23 @@ class FullScreenBreak:
         self.scale = 1.0
         self.layout = None
 
-        # Pre-map the window at startup to fully initialize root HWND wrapper structures,
-        # then immediately withdraw it so it is hidden from the user.
+        # Solid warning pill window at the top center
+        self.warning_window = tk.Toplevel(controller.root)
+        self.warning_window.attributes("-topmost", True)
+        self.warning_window.overrideredirect(True)
+        self.warning_window.attributes("-transparentcolor", "#000000")
+        self.warning_window.configure(bg="#000000")
+        self.warning_canvas = tk.Canvas(self.warning_window, bg="#000000", highlightthickness=0)
+        self.warning_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+
+        # Pre-map the windows at startup to fully initialize root HWND wrapper structures,
+        # then immediately withdraw them so they are hidden from the user.
         self.window.deiconify()
+        self.warning_window.deiconify()
         self.window.update()
+        self.warning_window.update()
         self.window.withdraw()
+        self.warning_window.withdraw()
 
     def _refresh_layout(self):
         self.scale = get_window_dpi_scale(self.window)
@@ -89,12 +101,10 @@ class FullScreenBreak:
             outline="",
         )
 
-    def init_geometry(self):
+    def init_geometry(self, is_warning=False):
         self.canvas.delete("all")
         sw, sh = self._refresh_layout()
         layout = self.layout
-        card_h = layout.card_y2 - layout.card_y1
-        guide_font_size = max(14, int(card_h * 0.032))
         close_stroke_width = max(2, scale_px(2.5, self.scale))
         close_icon_inset = max(scale_px(11, self.scale), layout.close_radius // 2)
         close_x1 = layout.close_center_x - layout.close_radius
@@ -106,120 +116,152 @@ class FullScreenBreak:
         self.canvas.configure(bg=self.bg_color)
         self.canvas.create_rectangle(0, 0, sw, sh, fill=self.bg_color, outline="")
         
-        # Centered rounded card
-        card_points = get_round_rect_points(
-            layout.card_x1,
-            layout.card_y1,
-            layout.card_x2,
-            layout.card_y2,
-            layout.card_radius,
-        )
-        self.canvas.create_polygon(
-            card_points,
-            fill=COLOR_CARD_BG,
-            outline=COLOR_CARD_BORDER,
-            width=max(1, scale_px(1.5, self.scale)),
-            smooth=True,
-        )
-        
-        # Static background circle track
-        self.canvas.create_oval(
-            layout.ring_x1,
-            layout.ring_y1,
-            layout.ring_x2,
-            layout.ring_y2,
-            outline="#1d2e24",
-            width=layout.ring_thickness,
-        )
-        
-        # Active progress arc
-        self.active_arc_id = self.canvas.create_arc(
-            layout.ring_x1,
-            layout.ring_y1,
-            layout.ring_x2,
-            layout.ring_y2,
-            start=90,
-            extent=360,
-            style=tk.ARC,
-            outline=COLOR_MINT_ACCENT,
-            width=layout.ring_thickness,
-        )
-        
-        # Countdown text
-        self.txt_timer = self.canvas.create_text(
-            layout.timer_x,
-            layout.timer_y,
-            text="",
-            font=("Segoe UI", layout.timer_font_size, "bold"),
-            fill=COLOR_TEXT_PRIMARY,
-            justify=tk.CENTER,
-        )
-        
-        # Guide text
-        self.guide_text_id = self.canvas.create_text(
-            layout.guide_x,
-            layout.guide_y,
-            text="",
-            font=("Microsoft JhengHei UI", guide_font_size, "bold"),
-            fill=COLOR_MINT_ACCENT,
-            anchor="n",
-            justify=tk.CENTER,
-            width=layout.guide_width,
-        )
-        
-        # Close chip hover background
-        self.close_chip_bg_id = self.canvas.create_oval(
-            close_x1,
-            close_y1,
-            close_x2,
-            close_y2,
-            fill=self.close_hover_color,
-            outline="",
-            width=0,
-            state="hidden",
-            tags="close_chip",
-        )
-        
-        # Close chip icon lines (X)
-        self.canvas.create_line(
-            close_x1 + close_icon_inset,
-            close_y1 + close_icon_inset,
-            close_x2 - close_icon_inset,
-            close_y2 - close_icon_inset,
-            fill=COLOR_RED_CLOSE,
-            width=close_stroke_width,
-            capstyle=tk.ROUND,
-            tags=("close_chip", "close_chip_icon"),
-        )
-        self.canvas.create_line(
-            close_x2 - close_icon_inset,
-            close_y1 + close_icon_inset,
-            close_x1 + close_icon_inset,
-            close_y2 - close_icon_inset,
-            fill=COLOR_RED_CLOSE,
-            width=close_stroke_width,
-            capstyle=tk.ROUND,
-            tags=("close_chip", "close_chip_icon"),
-        )
-        
-        self.canvas.tag_bind(
-            "close_chip", "<ButtonRelease-1>", lambda e: self.finish_early()
-        )
-        self.canvas.tag_bind(
-            "close_chip",
-            "<Enter>",
-            lambda e: self._set_close_chip_hover(True),
-        )
-        self.canvas.tag_bind(
-            "close_chip",
-            "<Leave>",
-            lambda e: self._set_close_chip_hover(False),
-        )
-        
-        self.canvas.tag_raise(self.txt_timer)
-        self.canvas.tag_raise(self.guide_text_id)
-        self.canvas.tag_raise(self.close_chip_bg_id)
-        self.canvas.tag_raise("close_chip_icon")
+        if is_warning:
+            # Minimalist countdown style in a solid 100% alpha window at the top center
+            pill_w = scale_px(510, self.scale)
+            pill_h = scale_px(40, self.scale)
+            x = sw // 2 - pill_w // 2
+            y = scale_px(40, self.scale)
+            self.warning_window.geometry(f"{pill_w}x{pill_h}+{x}+{y}")
+            
+            self.warning_canvas.delete("all")
+            self.warning_canvas.configure(width=pill_w, height=pill_h)
+            
+            # Warning pill background (thick bright green outline, green background)
+            pill_points = get_round_rect_points(0, 0, pill_w, pill_h, pill_h // 2)
+            self.warning_pill_id = self.warning_canvas.create_polygon(
+                pill_points,
+                fill="#113d23",
+                outline=COLOR_MINT_ACCENT,
+                width=max(2, scale_px(2.5, self.scale)),
+                smooth=True,
+            )
+            
+            self.warning_guide_text_id = self.warning_canvas.create_text(
+                pill_w // 2,
+                pill_h // 2,
+                text="",
+                font=("Microsoft JhengHei UI", -scale_px(17, self.scale), "bold"),
+                fill="#ffffff",
+                anchor="center",
+                justify=tk.CENTER,
+            )
+            
+            # Setup dummy/hidden elements on main canvas for compatibility/prevent errors
+            self.active_arc_id = self.canvas.create_arc(
+                0, 0, 0, 0, start=0, extent=0, style=tk.ARC, outline="", width=0, state="hidden"
+            )
+            self.txt_timer = self.canvas.create_text(
+                0, 0, text="", state="hidden"
+            )
+            self.guide_text_id = self.canvas.create_text(
+                0, 0, text="", state="hidden"
+            )
+            self.close_chip_bg_id = self.canvas.create_oval(
+                0, 0, 0, 0, state="hidden"
+            )
+        else:
+            # Redesigned solid background fullscreen layout (no central card)
+            
+            # Static background circle track
+            self.canvas.create_oval(
+                layout.ring_x1,
+                layout.ring_y1,
+                layout.ring_x2,
+                layout.ring_y2,
+                outline="#1d2e24",
+                width=layout.ring_thickness,
+            )
+            
+            # Active progress arc
+            self.active_arc_id = self.canvas.create_arc(
+                layout.ring_x1,
+                layout.ring_y1,
+                layout.ring_x2,
+                layout.ring_y2,
+                start=90,
+                extent=360,
+                style=tk.ARC,
+                outline=COLOR_MINT_ACCENT,
+                width=layout.ring_thickness,
+            )
+            
+            # Countdown text
+            self.txt_timer = self.canvas.create_text(
+                layout.timer_x,
+                layout.timer_y,
+                text="",
+                font=("Segoe UI", -layout.timer_font_size, "bold"),
+                fill=COLOR_TEXT_PRIMARY,
+                justify=tk.CENTER,
+            )
+            
+            # Guide text
+            guide_font_size = max(16, int(sh * 0.024))
+            self.guide_text_id = self.canvas.create_text(
+                layout.guide_x,
+                layout.guide_y,
+                text="",
+                font=("Microsoft JhengHei UI", -guide_font_size, "bold"),
+                fill=COLOR_MINT_ACCENT,
+                anchor="n",
+                justify=tk.CENTER,
+                width=layout.guide_width,
+            )
+            
+            # Close chip hover background
+            self.close_chip_bg_id = self.canvas.create_oval(
+                close_x1,
+                close_y1,
+                close_x2,
+                close_y2,
+                fill=self.close_hover_color,
+                outline="",
+                width=0,
+                state="hidden",
+                tags="close_chip",
+            )
+            
+            # Close chip icon lines (X)
+            self.canvas.create_line(
+                close_x1 + close_icon_inset,
+                close_y1 + close_icon_inset,
+                close_x2 - close_icon_inset,
+                close_y2 - close_icon_inset,
+                fill=COLOR_RED_CLOSE,
+                width=close_stroke_width,
+                capstyle=tk.ROUND,
+                tags=("close_chip", "close_chip_icon"),
+            )
+            self.canvas.create_line(
+                close_x2 - close_icon_inset,
+                close_y1 + close_icon_inset,
+                close_x1 + close_icon_inset,
+                close_y2 - close_icon_inset,
+                fill=COLOR_RED_CLOSE,
+                width=close_stroke_width,
+                capstyle=tk.ROUND,
+                tags=("close_chip", "close_chip_icon"),
+            )
+            
+            self.canvas.tag_bind(
+                "close_chip", "<ButtonRelease-1>", lambda e: self.finish_early()
+            )
+            self.canvas.tag_bind(
+                "close_chip",
+                "<Enter>",
+                lambda e: self._set_close_chip_hover(True),
+            )
+            self.canvas.tag_bind(
+                "close_chip",
+                "<Leave>",
+                lambda e: self._set_close_chip_hover(False),
+            )
+            
+            self.canvas.tag_raise(self.txt_timer)
+            self.canvas.tag_raise(self.guide_text_id)
+            self.canvas.tag_raise(self.close_chip_bg_id)
+            self.canvas.tag_raise("close_chip_icon")
 
     def _cancel_jobs(self):
         for job_name in ("_countdown_job", "_finish_job"):
@@ -235,28 +277,36 @@ class FullScreenBreak:
     def show(self, is_warning=False):
         self._session_id += 1
         self._cancel_jobs()
-        self.init_geometry()
+        self.init_geometry(is_warning=is_warning)
         session_id = self._session_id
         if is_warning:
             self._last_warning_remaining = None
-            self._last_warning_alpha = 0.15
+            self._last_warning_alpha = 0.0
+            
             self.window.deiconify()
+            self.warning_window.deiconify()
             self.window.update()  # Force drawing and window mapping
+            self.warning_window.update()
+            
             set_window_click_through(self.window)
-            self.window.attributes("-alpha", 0.15)
-            self.canvas.itemconfig("close_chip", state="hidden")
+            set_window_click_through(self.warning_window)
+            
+            self.window.attributes("-alpha", 0.0)
+            self.warning_window.attributes("-alpha", 1.0)
             
             # Re-apply click-through after 50ms to ensure the OS wrapper window handles are fully linked
             self.window.after(50, lambda: set_window_click_through(self.window))
+            self.warning_window.after(50, lambda: set_window_click_through(self.warning_window))
             
             # Record warning start time and kick off smooth 5Hz update job
             self._warning_start_time = time.time()
             self._warning_step(session_id)
         else:
+            self.warning_window.withdraw()
             self.window.deiconify()
             self.window.update()  # Force drawing and window mapping
             remove_window_click_through(self.window)
-            self.window.attributes("-alpha", 0.95)
+            self.window.attributes("-alpha", 1.0)
             self.canvas.itemconfig("close_chip", state="normal")
             self.canvas.itemconfig(self.close_chip_bg_id, state="hidden")
             self.window.focus_force()
@@ -267,6 +317,7 @@ class FullScreenBreak:
         self._session_id += 1
         self._cancel_jobs()
         self.window.withdraw()
+        self.warning_window.withdraw()
 
     def _apply_break_copy(self, state_name):
         self.canvas.itemconfig(self.guide_text_id, text=FULLSCREEN_COPY[state_name])
@@ -278,10 +329,10 @@ class FullScreenBreak:
         elapsed = time.time() - self._warning_start_time
         
         if elapsed < total_dur:
-            # Smoothly transition alpha from 0.15 to 0.85
-            current_alpha = 0.15 + 0.70 * (elapsed / total_dur)
-            # Only update window alpha if it differs significantly (>= 0.035) or it's the first frame
-            if self._last_warning_alpha is None or abs(current_alpha - self._last_warning_alpha) >= 0.035:
+            # Smoothly transition alpha from 0.0 to 0.50
+            current_alpha = 0.0 + 0.50 * (elapsed / total_dur)
+            # Only update window alpha if it differs significantly (>= 0.02) or it's the first frame
+            if self._last_warning_alpha is None or abs(current_alpha - self._last_warning_alpha) >= 0.02:
                 self.window.attributes("-alpha", current_alpha)
                 self._last_warning_alpha = current_alpha
             
@@ -292,8 +343,8 @@ class FullScreenBreak:
             # Display ceiling rounded integer remaining seconds, only update text when it actually changes
             remaining = int(math.ceil(total_dur - elapsed))
             if remaining != self._last_warning_remaining:
-                warning_text = f"休息即將開始 (還有 {remaining} 秒)\n您可以點選右下角懸浮球暫停"
-                self.canvas.itemconfig(self.guide_text_id, text=warning_text, fill=COLOR_AMBER_WARNING)
+                warning_text = f"休息即將開始 (還有 {remaining} 秒)  |  可點選右下角懸浮球暫停"
+                self.warning_canvas.itemconfig(self.warning_guide_text_id, text=warning_text, fill="#ffffff")
                 self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
                 self._last_warning_remaining = remaining
             
