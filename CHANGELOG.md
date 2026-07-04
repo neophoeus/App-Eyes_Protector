@@ -2,6 +2,15 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.5 - 2026-07-04
+
+### Optimized
+- **I18n Translation Optimizations**: Refined and improved user experience for translations in English, Traditional/Simplified Chinese, Japanese, and Korean.
+- **Single-instance Mutex Terminology**: Standardized Mutex error warnings to use proper local terminology (e.g. "二重起動防止", "중복 실행 방지").
+
+### Fixed
+- **Chinese Sublanguage Detection**: Resolved a bug in the Windows LCID sublanguage parser to correctly route Hong Kong (`0x03`) and Macau (`0x05`) to `zh-TW`, and Singapore (`0x04`) and Malaysia (`0x06`) to `zh-CN`.
+
 ## v3.4 - 2026-07-04
 
 ### Added
