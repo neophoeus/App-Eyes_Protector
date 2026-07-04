@@ -7,6 +7,7 @@ from tkinter import messagebox
 import winsound
 
 from .core import BUSY_REASON_FULLSCREEN, BUSY_REASON_NONE
+from .i18n import t
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -255,7 +256,7 @@ def check_single_instance(root):
         root.attributes("-topmost", True)
         messagebox.showerror(
             "App-Eyes Protector",
-            "無法建立單實例鎖定，程式將結束。\n請稍後再試，或重新啟動 Windows 後再執行。",
+            t("err_mutex"),
             parent=root,
         )
         raise SystemExit(1)
@@ -264,13 +265,13 @@ def check_single_instance(root):
         root.attributes("-topmost", True)
         if messagebox.askyesno(
             "App-Eyes Protector",
-            "護眼助理目前正在背景為您倒數計時中。\n\n您想要完全「強制關閉」這個軟體嗎？\n(按下「是」將會結束常駐保護)",
+            t("ask_force_close"),
             parent=root,
         ):
             if not force_close_existing_instance():
                 messagebox.showinfo(
                     "App-Eyes Protector",
-                    "目前只能在打包執行檔模式下自動關閉既有實例。\n請手動結束舊的護眼程式後再重新啟動。",
+                    t("info_manual_close"),
                     parent=root,
                 )
         raise SystemExit(0)

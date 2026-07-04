@@ -2,6 +2,13 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.4 - 2026-07-04
+
+### Added
+- **Multi-language Support (i18n)**: Implemented automatic Windows display language detection supporting Simplified Chinese, Japanese, Korean, English, and Traditional Chinese.
+- **Dynamic Sizing Adaptations**: Integrated text length measurements to dynamically scale and adjust layout parameters of the floating widget and warning banner card.
+- **Headless Unit Testing Support**: Added offline text width calculations allowing the test suite to execute successfully in standard mock environments without a graphical Tk context.
+
 ## v3.3 - 2026-07-04
 
 ### Added

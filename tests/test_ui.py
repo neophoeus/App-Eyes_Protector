@@ -98,6 +98,30 @@ class FloatingWidgetTests(unittest.TestCase):
         # The controller should NOT start a full break
         controller.start_full_break.assert_not_called()
 
+    @mock.patch("eyes_protector.ui.get_window_dpi_scale")
+    @mock.patch("tkinter.Toplevel")
+    @mock.patch("tkinter.Canvas")
+    def test_update_dynamic_layout_resizes_widget_correctly(
+        self, mock_canvas_cls, mock_toplevel_cls, mock_get_dpi
+    ):
+        mock_get_dpi.return_value = 1.0
+        controller = mock.MagicMock()
+        controller.paused = False
+        
+        widget = FloatingWidget(controller)
+        widget._expanded = True
+        
+        # Test with original English/Chinese protecting text
+        widget.update_pause_ui()
+        width_normal = widget.metrics.window_width
+        
+        # Test with a mocked very long text to check resizing growth
+        with mock.patch("eyes_protector.ui.t", return_value="This is a very very long mock text for testing widget auto expansion"):
+            widget.update_pause_ui()
+            width_long = widget.metrics.window_width
+            
+        self.assertGreater(width_long, width_normal)
+
 
 if __name__ == "__main__":
     unittest.main()

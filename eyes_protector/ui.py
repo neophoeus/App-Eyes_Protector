@@ -14,14 +14,9 @@ from .ui_metrics import (
     center_window_position,
     get_round_rect_points,
     scale_px,
+    make_box,
 )
-
-
-FULLSCREEN_COPY = {
-    "countdown": "每20分鐘，花20秒鐘，看20呎外",
-    "complete": "休息完成，慢慢回到工作",
-    "skipped": "已返回工作，稍後會再提醒。",
-}
+from .i18n import t
 
 # Forest Dark Mode Theme Colors
 COLOR_SCREEN_BG = "#0d130f"
@@ -49,6 +44,23 @@ def _relative_point(box, x_ratio, y_ratio):
     width = x2 - x1
     height = y2 - y1
     return (x1 + (width * x_ratio), y1 + (height * y_ratio))
+
+
+def _measure_text_width(text, font_family, font_size, is_bold, scale):
+    try:
+        from tkinter import font as tkfont
+        f = tkfont.Font(family=font_family, size=font_size, weight="bold" if is_bold else "normal")
+        return f.measure(text)
+    except Exception:
+        # Fallback estimation for tests where Tk context is not available
+        base_size = abs(font_size) if font_size < 0 else int(font_size * 1.33)
+        width = 0
+        for char in text:
+            if ord(char) > 127:
+                width += base_size
+            else:
+                width += base_size * 0.55
+        return scale_px(width, scale)
 
 
 class FullScreenBreak:
@@ -320,7 +332,7 @@ class FullScreenBreak:
         self.warning_window.withdraw()
 
     def _apply_break_copy(self, state_name):
-        self.canvas.itemconfig(self.guide_text_id, text=FULLSCREEN_COPY[state_name])
+        self.canvas.itemconfig(self.guide_text_id, text=t(state_name))
 
     def _warning_step(self, session_id):
         if session_id != self._session_id:
@@ -343,7 +355,25 @@ class FullScreenBreak:
             # Display ceiling rounded integer remaining seconds, only update text when it actually changes
             remaining = int(math.ceil(total_dur - elapsed))
             if remaining != self._last_warning_remaining:
-                warning_text = f"休息即將開始 (還有 {remaining} 秒)  |  可點選右下角懸浮球暫停"
+                warning_text = t("warning_text", remaining=remaining)
+                
+                # Dynamic width adaptation for the warning pill banner
+                text_width = _measure_text_width(warning_text, "Microsoft JhengHei UI", -scale_px(17, self.scale), True, self.scale)
+                
+                sw = self.window.winfo_screenwidth()
+                pill_h = scale_px(40, self.scale)
+                min_pill_w = scale_px(510, self.scale)
+                pill_w = max(min_pill_w, text_width + scale_px(40, self.scale))
+                
+                x = sw // 2 - pill_w // 2
+                y = scale_px(40, self.scale)
+                self.warning_window.geometry(f"{pill_w}x{pill_h}+{x}+{y}")
+                self.warning_canvas.configure(width=pill_w)
+                
+                pill_points = get_round_rect_points(0, 0, pill_w, pill_h, pill_h // 2)
+                self.warning_canvas.coords(self.warning_pill_id, *pill_points)
+                self.warning_canvas.coords(self.warning_guide_text_id, pill_w // 2, pill_h // 2)
+                
                 self.warning_canvas.itemconfig(self.warning_guide_text_id, text=warning_text, fill="#ffffff")
                 self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
                 self._last_warning_remaining = remaining
@@ -488,6 +518,57 @@ class FloatingWidget:
         self._close_hovered = False
         self._pressed_control = None
         self.update_pause_ui()
+
+    def _update_dynamic_layout(self):
+        paused = getattr(self.controller, "paused", False)
+        text = t("paused") if paused else t("protecting")
+        
+        text_width = _measure_text_width(text, "Microsoft JhengHei UI", 10, True, self.scale)
+        
+        scale = self.scale
+        min_pause_x1 = scale_px(114, scale)
+        pause_x1 = max(min_pause_x1, self.metrics.label_x + text_width + scale_px(8, scale))
+        
+        control_size = scale_px(32, scale)
+        pause_x2 = pause_x1 + control_size
+        pause_center_x = (pause_x1 + pause_x2) // 2
+        
+        close_x1 = pause_x2 + scale_px(8, scale)
+        close_x2 = close_x1 + control_size
+        close_center_x = (close_x1 + close_x2) // 2
+        
+        w_expanded = close_x2 + scale_px(9, scale)
+        
+        from dataclasses import replace
+        
+        expanded_rect = (
+            scale_px(2, scale),
+            scale_px(2, scale),
+            w_expanded - scale_px(2, scale),
+            self.metrics.height - scale_px(2, scale),
+        )
+        
+        self.metrics = replace(
+            self.metrics,
+            window_width=w_expanded,
+            expanded_rect=expanded_rect,
+            pause_box=make_box(pause_center_x, self.metrics.center_y, control_size),
+            close_box=make_box(close_center_x, self.metrics.center_y, control_size),
+        )
+        self.hover_coords = expanded_rect
+        
+        if self._expanded:
+            self.canvas.configure(width=w_expanded)
+            right_x = self.window.winfo_x() + self.window.winfo_width()
+            h = self.metrics.height
+            new_x = right_x - w_expanded
+            y = self.window.winfo_y()
+            self.window.geometry(f"{w_expanded}x{h}+{new_x}+{y}")
+            
+            new_points = get_round_rect_points(*expanded_rect, self.metrics.radius)
+            self.canvas.coords(self.bg_id, *new_points)
+            self.canvas.coords(self.btn_pause, *self.metrics.pause_box)
+            self.canvas.coords(self.btn_close, *self.metrics.close_box)
 
     def _control_from_hit_items(self, hit_items):
         for item_id in hit_items:
@@ -803,17 +884,18 @@ class FloatingWidget:
         )
 
     def update_pause_ui(self):
+        self._update_dynamic_layout()
         if getattr(self.controller, "paused", False):
             self._draw_eye("closed")
             if self._expanded:
-                self.canvas.itemconfig(self.txt_label, text="已暫停", fill=COLOR_AMBER_WARNING)
+                self.canvas.itemconfig(self.txt_label, text=t("paused"), fill=COLOR_AMBER_WARNING)
             self._draw_pause_control()
             self._draw_close_control()
             self._raise_control_hitboxes()
             return
         self._draw_eye("open")
         if self._expanded:
-            self.canvas.itemconfig(self.txt_label, text="保護中", fill=COLOR_MINT_ACCENT)
+            self.canvas.itemconfig(self.txt_label, text=t("protecting"), fill=COLOR_MINT_ACCENT)
         self._draw_pause_control()
         self._draw_close_control()
         self._raise_control_hitboxes()
@@ -880,6 +962,7 @@ class FloatingWidget:
         if self._dragged or self._pressed_control is not None:
             return
         self.window.attributes("-alpha", 0.95)
+        self.update_pause_ui()
         new_points = get_round_rect_points(*self.hover_coords, self.metrics.radius)
         self.canvas.coords(self.bg_id, *new_points)
         self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline=COLOR_FLOATING_BORDER_HOVER)
@@ -891,10 +974,11 @@ class FloatingWidget:
             new_x = right_x - w_expanded
             y = self.window.winfo_y()
             self.window.geometry(f"{w_expanded}x{h}+{new_x}+{y}")
+            self.canvas.configure(width=w_expanded)
             self._expanded = True
+            self.update_pause_ui()
         self.canvas.itemconfig(self.btn_pause, state="normal")
         self.canvas.itemconfig(self.btn_close, state="normal")
-        self.update_pause_ui()
         self._raise_control_hitboxes()
         self.window.config(cursor="hand2")
 
