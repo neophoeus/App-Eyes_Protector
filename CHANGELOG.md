@@ -2,6 +2,25 @@
 
 All notable changes to App-Eyes Protector are documented here.
 
+## v3.6 - 2026-10-30
+
+### Added
+- **Zero-Dependency JSON Configuration & CLI Flags**: Added support for optional `%APPDATA%\AppEyesProtector\config.json` with robust bounds checking, clamping, and error recovery. Added CLI flags (`--interval`, `--break-seconds`, `--warning-seconds`, `--snooze-minutes`, `--mute`, `--lang`, `--config`).
+- **Expanded Countdown Display in Floating Widget**: Hovering the floating widget now reveals real-time `Protecting MM:SS` status alongside pause/close buttons with zero performance penalty when collapsed.
+- **Intelligent Left-Edge Unfold Adaptation**: The floating widget detects proximity to the left work area edge and dynamically expands rightward, completely preventing screen-edge clipping.
+- **Multi-Monitor Virtual Desktop & Active Monitor Awareness**: Floating widget can be freely positioned across multi-monitor virtual screens; the fullscreen break and top warning pill automatically target the active monitor where the mouse cursor resides.
+- **Snooze Support via Right-Click & Break Screen Interruption**: Right-clicking the floating widget during warning or break triggers an instant snooze. Closing an active break early now correctly snoozes for 5 minutes instead of resetting the full 20-minute cycle.
+
+### Optimized
+- **Sleep/Suspend Detection Guard**: Wall-clock jump tracking (`time.time()`) resets the reminder timer when resuming from system sleep/hibernation, preventing sudden full-screen break triggers upon wakeup.
+- **Drift-Compensated Monotonic Scheduling**: Integrated `time.monotonic()` delta compensation to eliminate timer drift over long runtime sessions.
+- **Windows Lock Screen & Desktop Exclusion**: Mapped `QUNS_NOT_PRESENT (1)` to idle state (resets timer when user locks Windows with `Win+L`); excluded `Progman` and `WorkerW` desktop shells from fullscreen gaming/video detection.
+
+### Fixed
+- **50ms Click-Through Race Condition & Immediate 0ms Penetration**: Session-guarded delayed click-through callbacks prevent race conditions where quick break transitions left the break screen unclickable. Adjusted style application order so 0ms click-through takes effect immediately.
+- **Multi-Monitor Negative Coordinate Geometry Formatting**: Fixed Tkinter geometry string generation to use `+{x}+{y}` format (e.g. `+-1920+0`), preventing negative secondary monitor coordinates from defaulting to primary monitor right-edge offsets.
+- **Fullscreen Monitor Geometry & DPI Refresh**: Added `update_idletasks()` before reapplying fullscreen mode to ensure Win32 window handles correctly move to secondary displays and query the target monitor's per-window DPI.
+
 ## v3.5 - 2026-07-04
 
 ### Optimized

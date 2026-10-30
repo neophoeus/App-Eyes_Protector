@@ -6,8 +6,8 @@ from eyes_protector.core import (
     BUSY_REASON_IDLE,
     BUSY_REASON_NONE,
     STATE_BREAKING,
-    STATE_WARNING,
     STATE_RUNNING,
+    STATE_WARNING,
     apply_finish_break,
     apply_quit,
     apply_snooze,
@@ -98,6 +98,18 @@ class CoreStateTests(unittest.TestCase):
         self.assertEqual(result.runtime.state, STATE_WARNING)
         self.assertTrue(result.runtime.floating_visible)
         self.assertTrue(result.should_start_warning)
+
+    def test_apply_tick_with_custom_elapsed_delta(self):
+        runtime = create_runtime_state(TEST_CONFIG)
+        result = apply_tick(runtime, TEST_CONFIG, BUSY_REASON_NONE, elapsed_delta=4)
+        self.assertEqual(result.runtime.time_elapsed, 4)
+        self.assertFalse(result.should_start_warning)
+
+        # Trigger warning with jump
+        result2 = apply_tick(result.runtime, TEST_CONFIG, BUSY_REASON_NONE, elapsed_delta=7)
+        self.assertEqual(result2.runtime.time_elapsed, 11)
+        self.assertEqual(result2.runtime.state, STATE_WARNING)
+        self.assertTrue(result2.should_start_warning)
 
     def test_resume_from_pause_resets_elapsed(self):
         runtime = create_runtime_state(TEST_CONFIG)

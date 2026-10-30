@@ -6,7 +6,7 @@
 
 A highly lightweight, zero-dependency, immersive eye protection assistant for Windows.
 
-**Latest Release:** v3.5  
+**Latest Release:** v3.6  
 **Release Notes:** See [CHANGELOG.md](CHANGELOG.md)
 
 > **What is the 20-20-20 Rule?**  
@@ -45,10 +45,19 @@ This project has been compiled into a single portable executable using PyInstall
 #### Manual Testing and Operation
 
 - **Show CLI Help Instructions**: Run `EyesProtector.exe --help` or `-h` to print detailed option descriptions and exit cleanly.
+- **Custom Timer & Behavior via CLI**:
+  - `--interval SECONDS`: Work break interval (default: 1200s / 20 mins).
+  - `--break-seconds SECONDS`: Break duration (default: 20s).
+  - `--warning-seconds SECONDS`: Warning duration (default: 10s).
+  - `--snooze-minutes MINUTES`: Snooze duration (default: 5 mins).
+  - `--mute`: Silence all audio chimes.
+  - `--lang CODE`: Set UI language (`zh-TW`, `zh-CN`, `ja`, `ko`, `en`).
+  - `--config PATH`: Load custom JSON configuration.
+- **Optional JSON Configuration File**: You can create `%APPDATA%\AppEyesProtector\config.json` to persist custom settings across launches.
 - **Test Animation Effects**: You can run `EyesProtector.exe --test` from the terminal to immediately test the 10-second reminder and 5-second break.
-- **Pre-Break Warning & Postpone**: When the warning starts, you can hover over the floating widget in the bottom-right corner and click the canvas-drawn pause control to immediately dismiss the warning and pause protection.
-- **Interrupt Break**: If you urgently need to return to work during a break, click the top-right close chip to end the break early and return to background timing.
-- **Pause / Exit Program**: To completely close or pause the eye protection assistant, move your mouse over the "semi-transparent eye floating widget" in the bottom-right corner. You can click the canvas-drawn pause control to pause protection, or click the red close control on the expanded panel to safely end it.
+- **Pre-Break Warning & Postpone**: When the warning starts, you can right-click the floating widget or press `<Escape>` to immediately snooze for 5 minutes. Hovering allows clicking the pause control.
+- **Interrupt Break**: If you urgently need to return to work during a break, click the top-right close chip or press `<Escape>` to snooze for 5 minutes and return to work. Once the break countdown finishes (00s), clicking dismisses the completion view immediately.
+- **Pause / Exit Program**: Move your mouse over the floating widget in the corner to see the live `Protecting MM:SS` countdown. Click the pause control to pause/resume, or click the red close control to safely exit. Drag freely across multi-monitor setups; expanding near the left edge will automatically fold rightward.
 
 ### 🛠️ Development and Building
 

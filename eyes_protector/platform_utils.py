@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import messagebox
 import winsound
 
-from .core import BUSY_REASON_FULLSCREEN, BUSY_REASON_NONE
+from .core import BUSY_REASON_FULLSCREEN, BUSY_REASON_IDLE, BUSY_REASON_NONE
 from .i18n import t
 
 
@@ -32,6 +32,10 @@ class MONITORINFO(ctypes.Structure):
     ]
 
 
+class POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
 MONITOR_DEFAULTTONEAREST = 2
 ERROR_ALREADY_EXISTS = 183
 FULLSCREEN_MARGIN_PX = 2
@@ -39,6 +43,19 @@ BASE_DPI = 96
 PROCESS_PER_MONITOR_DPI_AWARE = 2
 E_ACCESSDENIED = 0x80070005
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = ctypes.c_void_p(-4)
+
+QUNS_NOT_PRESENT = 1
+QUNS_RUNNING_D3D_FULL_SCREEN = 3
+QUNS_PRESENTATION_MODE = 4
+SHELL_WINDOW_CLASSES = frozenset({"Progman", "WorkerW"})
+
+RectTuple = tuple[int, int, int, int]
+
+
+def _safe_int(val, default):
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        return int(val)
+    return default
 
 
 def _is_access_denied_hresult(result):
@@ -98,9 +115,12 @@ def _extract_window_handle(window):
     if window is None:
         return None
     try:
-        return window.winfo_id()
+        val = window.winfo_id()
+        if isinstance(val, int) and not isinstance(val, bool):
+            return val
     except Exception:
-        return None
+        pass
+    return None
 
 
 def get_window_dpi(window=None, hwnd=None):
@@ -145,6 +165,16 @@ def _foreground_window_covers_monitor():
         if user32.IsIconic(hwnd) or not user32.IsWindowVisible(hwnd):
             return False
 
+        # Exclude Windows desktop shell windows from fullscreen detection
+        shell_hwnd = user32.GetShellWindow() if hasattr(user32, "GetShellWindow") else None
+        if shell_hwnd and hwnd == shell_hwnd:
+            return False
+
+        class_buf = ctypes.create_unicode_buffer(256)
+        if user32.GetClassNameW(hwnd, class_buf, 256) > 0:
+            if class_buf.value in SHELL_WINDOW_CLASSES:
+                return False
+
         rect = RECT()
         if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
             return False
@@ -171,6 +201,88 @@ def _foreground_window_covers_monitor():
         return False
 
 
+def get_virtual_screen_rect(fallback_size: tuple[int, int] = (1920, 1080)) -> RectTuple:
+    fb_w = _safe_int(fallback_size[0] if len(fallback_size) > 0 else None, 1920)
+    fb_h = _safe_int(fallback_size[1] if len(fallback_size) > 1 else None, 1080)
+    try:
+        user32 = ctypes.windll.user32
+        left = int(user32.GetSystemMetrics(76))   # SM_XVIRTUALSCREEN
+        top = int(user32.GetSystemMetrics(77))    # SM_YVIRTUALSCREEN
+        width = int(user32.GetSystemMetrics(78))  # SM_CXVIRTUALSCREEN
+        height = int(user32.GetSystemMetrics(79)) # SM_CYVIRTUALSCREEN
+        if width > 0 and height > 0:
+            return (left, top, left + width, top + height)
+    except Exception:
+        pass
+    return (0, 0, fb_w, fb_h)
+
+
+def get_monitor_work_area(
+    window: object | None = None,
+    point: tuple[int, int] | None = None,
+    fallback_size: tuple[int, int] = (1920, 1080),
+) -> RectTuple:
+    fb_w = _safe_int(fallback_size[0] if len(fallback_size) > 0 else None, 1920)
+    fb_h = _safe_int(fallback_size[1] if len(fallback_size) > 1 else None, 1080)
+    try:
+        user32 = ctypes.windll.user32
+        monitor = None
+        if point is not None:
+            px = _safe_int(point[0], None)
+            py = _safe_int(point[1], None)
+            if px is not None and py is not None:
+                pt = POINT(px, py)
+                monitor = user32.MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST)
+        else:
+            hwnd = _extract_window_handle(window)
+            if hwnd:
+                monitor = user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+            else:
+                cursor_pt = POINT()
+                if user32.GetCursorPos(ctypes.byref(cursor_pt)):
+                    monitor = user32.MonitorFromPoint(cursor_pt, MONITOR_DEFAULTTONEAREST)
+                else:
+                    monitor = user32.MonitorFromWindow(0, MONITOR_DEFAULTTONEAREST)
+
+        if monitor:
+            monitor_info = MONITORINFO()
+            monitor_info.cbSize = ctypes.sizeof(MONITORINFO)
+            if user32.GetMonitorInfoW(monitor, ctypes.byref(monitor_info)):
+                rc = monitor_info.rcWork
+                return (int(rc.left), int(rc.top), int(rc.right), int(rc.bottom))
+    except Exception:
+        pass
+    return (0, 0, fb_w, fb_h)
+
+
+def get_active_monitor_rect(
+    window: object | None = None,
+    fallback_size: tuple[int, int] = (1920, 1080),
+) -> RectTuple:
+    fb_w = _safe_int(fallback_size[0] if len(fallback_size) > 0 else None, 1920)
+    fb_h = _safe_int(fallback_size[1] if len(fallback_size) > 1 else None, 1080)
+    try:
+        user32 = ctypes.windll.user32
+        monitor = None
+        cursor_pt = POINT()
+        if user32.GetCursorPos(ctypes.byref(cursor_pt)):
+            monitor = user32.MonitorFromPoint(cursor_pt, MONITOR_DEFAULTTONEAREST)
+        if not monitor and window:
+            hwnd = _extract_window_handle(window)
+            if hwnd:
+                monitor = user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+
+        if monitor:
+            monitor_info = MONITORINFO()
+            monitor_info.cbSize = ctypes.sizeof(MONITORINFO)
+            if user32.GetMonitorInfoW(monitor, ctypes.byref(monitor_info)):
+                rc = monitor_info.rcMonitor
+                return (int(rc.left), int(rc.top), int(rc.right), int(rc.bottom))
+    except Exception:
+        pass
+    return (0, 0, fb_w, fb_h)
+
+
 def create_single_instance_mutex(mutex_name):
     mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
     error_code = ctypes.windll.kernel32.GetLastError()
@@ -179,7 +291,10 @@ def create_single_instance_mutex(mutex_name):
 
 def get_platform_busy_reason():
     state = _query_user_notification_state()
-    if state in (3, 4):
+    # QUNS_NOT_PRESENT (1): Screen locked, screensaver active, or user switched away
+    if state == QUNS_NOT_PRESENT:
+        return BUSY_REASON_IDLE
+    if state in (QUNS_RUNNING_D3D_FULL_SCREEN, QUNS_PRESENTATION_MODE):
         return BUSY_REASON_FULLSCREEN
     if _foreground_window_covers_monitor():
         return BUSY_REASON_FULLSCREEN
@@ -191,12 +306,15 @@ def is_fullscreen_or_busy():
 
 
 def get_idle_time():
-    lii = LASTINPUTINFO()
-    lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
-    if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
-        tick = ctypes.windll.kernel32.GetTickCount()
-        elapsed = (tick - lii.dwTime) & 0xFFFFFFFF
-        return elapsed / 1000.0
+    try:
+        lii = LASTINPUTINFO()
+        lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
+        if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+            tick = ctypes.windll.kernel32.GetTickCount()
+            elapsed = (tick - lii.dwTime) & 0xFFFFFFFF
+            return elapsed / 1000.0
+    except Exception:
+        pass
     return 0.0
 
 
@@ -285,27 +403,29 @@ WS_EX_LAYERED = 0x80000
 
 def set_window_click_through(window):
     try:
-        hwnd = window.winfo_id()
+        hwnd = _extract_window_handle(window)
+        if not hwnd:
+            return
         user32 = ctypes.windll.user32
-        
+
         user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
         user32.GetAncestor.restype = ctypes.c_void_p
         hwnd_root = user32.GetAncestor(hwnd, 2)  # GA_ROOT = 2
         if not hwnd_root:
             hwnd_root = hwnd
-            
+
         if hasattr(user32, "GetWindowLongPtrW"):
             get_long = user32.GetWindowLongPtrW
             set_long = user32.SetWindowLongPtrW
         else:
             get_long = user32.GetWindowLongW
             set_long = user32.SetWindowLongW
-            
+
         get_long.argtypes = [ctypes.c_void_p, ctypes.c_int]
         get_long.restype = ctypes.c_size_t
         set_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_size_t]
         set_long.restype = ctypes.c_size_t
-        
+
         style = get_long(hwnd_root, GWL_EXSTYLE)
         set_long(hwnd_root, GWL_EXSTYLE, style | WS_EX_TRANSPARENT | WS_EX_LAYERED)
     except Exception:
@@ -314,29 +434,30 @@ def set_window_click_through(window):
 
 def remove_window_click_through(window):
     try:
-        hwnd = window.winfo_id()
+        hwnd = _extract_window_handle(window)
+        if not hwnd:
+            return
         user32 = ctypes.windll.user32
-        
+
         user32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
         user32.GetAncestor.restype = ctypes.c_void_p
         hwnd_root = user32.GetAncestor(hwnd, 2)
         if not hwnd_root:
             hwnd_root = hwnd
-            
+
         if hasattr(user32, "GetWindowLongPtrW"):
             get_long = user32.GetWindowLongPtrW
             set_long = user32.SetWindowLongPtrW
         else:
             get_long = user32.GetWindowLongW
             set_long = user32.SetWindowLongW
-            
+
         get_long.argtypes = [ctypes.c_void_p, ctypes.c_int]
         get_long.restype = ctypes.c_size_t
         set_long.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_size_t]
         set_long.restype = ctypes.c_size_t
-        
+
         style = get_long(hwnd_root, GWL_EXSTYLE)
         set_long(hwnd_root, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT)
     except Exception:
         pass
-

@@ -1,34 +1,25 @@
-# Python 原生暫存與編譯檔案
+# Python Bytecode & Cache
 __pycache__/
 *.py[cod]
-*$py.class
 *.pyd
+.pytest_cache/
 
-# 環境設定
+# Virtual Environments & Env Vars
 .env
-.venv
-env/
+.venv/
 venv/
-ENV/
-env.bak/
-venv.bak/
+env/
 
-# 開發工具
-.vscode/*
-!.vscode/settings.json
+# IDEs & Editors
 .idea/
-.spyderproject
-.ropeproject
 
-# PyInstaller 產生物件
+# PyInstaller Build Artifacts (keep portable dist/EyesProtector.exe)
 *.spec
 build/
-# 由於這是一個可以直接執行的可攜軟體，決定將 dist 放進版本控制讓其他人可以直接下載 exe
-# 但忽略編譯中產生的其他不需要的快取
 !dist/
 dist/*
 !dist/EyesProtector.exe
 
-# OS 產生檔案
+# OS Metadata
 .DS_Store
 Thumbs.db

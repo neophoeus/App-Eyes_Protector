@@ -1,22 +1,24 @@
-import tkinter as tk
-import time
 import math
+import time
+import tkinter as tk
 
+from .i18n import t
 from .platform_utils import (
+    get_active_monitor_rect,
+    get_monitor_work_area,
+    get_virtual_screen_rect,
     get_window_dpi_scale,
+    remove_window_click_through,
     safe_play_sound,
     set_window_click_through,
-    remove_window_click_through,
 )
 from .ui_metrics import (
     build_floating_widget_metrics,
     build_fullscreen_layout,
-    center_window_position,
     get_round_rect_points,
-    scale_px,
     make_box,
+    scale_px,
 )
-from .i18n import t
 
 # Forest Dark Mode Theme Colors
 COLOR_SCREEN_BG = "#0d130f"
@@ -34,7 +36,6 @@ COLOR_FLOATING_BORDER_NORMAL = "#28382e"
 COLOR_FLOATING_BORDER_HOVER = "#5cdb95"
 
 
-
 def _expand_box(box, delta):
     return (box[0] - delta, box[1] - delta, box[2] + delta, box[3] + delta)
 
@@ -46,21 +47,48 @@ def _relative_point(box, x_ratio, y_ratio):
     return (x1 + (width * x_ratio), y1 + (height * y_ratio))
 
 
+def format_remaining_mmss(seconds: int) -> str:
+    sec = max(0, int(seconds))
+    m = sec // 60
+    s = sec % 60
+    return f"{m:02d}:{s:02d}"
+
+
+def _format_geometry_offset(x, y):
+    x_val = int(x) if isinstance(x, (int, float)) and not isinstance(x, bool) else x
+    y_val = int(y) if isinstance(y, (int, float)) and not isinstance(y, bool) else y
+    return f"+{x_val}+{y_val}"
+
+
 def _measure_text_width(text, font_family, font_size, is_bold, scale):
     try:
         from tkinter import font as tkfont
-        f = tkfont.Font(family=font_family, size=font_size, weight="bold" if is_bold else "normal")
+        f = tkfont.Font(
+            family=font_family,
+            size=font_size,
+            weight="bold" if is_bold else "normal",
+        )
         return f.measure(text)
     except Exception:
         # Fallback estimation for tests where Tk context is not available
-        base_size = abs(font_size) if font_size < 0 else int(font_size * 1.33)
-        width = 0
-        for char in text:
-            if ord(char) > 127:
-                width += base_size
-            else:
-                width += base_size * 0.55
-        return scale_px(width, scale)
+        if font_size < 0:
+            base_size = abs(font_size)
+            width = 0
+            for char in text:
+                if ord(char) > 127:
+                    width += base_size
+                else:
+                    width += base_size * 0.55
+            return max(1, int(round(width)))
+        else:
+            base_size = int(font_size * 1.33)
+            width = 0
+            for char in text:
+                if ord(char) > 127:
+                    width += base_size
+                else:
+                    width += base_size * 0.55
+            return scale_px(width, scale)
 
 
 class FullScreenBreak:
@@ -77,6 +105,10 @@ class FullScreenBreak:
         self._countdown_job = None
         self._finish_job = None
         self._session_id = 0
+        self._warning_delay_jobs = []
+        self._is_warning_active = False
+        self._break_completed = False
+        self._is_finishing = False
         self.scale = 1.0
         self.layout = None
 
@@ -86,8 +118,13 @@ class FullScreenBreak:
         self.warning_window.overrideredirect(True)
         self.warning_window.attributes("-transparentcolor", "#000000")
         self.warning_window.configure(bg="#000000")
-        self.warning_canvas = tk.Canvas(self.warning_window, bg="#000000", highlightthickness=0)
+        self.warning_canvas = tk.Canvas(
+            self.warning_window, bg="#000000", highlightthickness=0
+        )
         self.warning_canvas.place(x=0, y=0, relwidth=1, relheight=1)
+
+        # Bind Escape key to allow early exit or snooze
+        self.window.bind("<Escape>", lambda e: self.finish_early())
 
         # Pre-map the windows at startup to fully initialize root HWND wrapper structures,
         # then immediately withdraw them so they are hidden from the user.
@@ -99,9 +136,16 @@ class FullScreenBreak:
         self.warning_window.withdraw()
 
     def _refresh_layout(self):
+        # Position dynamically to the active monitor before reading per-window DPI
+        mon_x1, mon_y1, mon_x2, mon_y2 = get_active_monitor_rect(self.window)
+        sw = max(800, mon_x2 - mon_x1)
+        sh = max(600, mon_y2 - mon_y1)
+        self._mon_rect = (mon_x1, mon_y1, mon_x2, mon_y2)
+        self.window.attributes("-fullscreen", False)
+        self.window.geometry(f"{sw}x{sh}{_format_geometry_offset(mon_x1, mon_y1)}")
+        self.window.update_idletasks()
+        self.window.attributes("-fullscreen", True)
         self.scale = get_window_dpi_scale(self.window)
-        sw = self.window.winfo_screenwidth()
-        sh = self.window.winfo_screenheight()
         self.layout = build_fullscreen_layout(sw, sh, self.scale)
         return sw, sh
 
@@ -116,6 +160,7 @@ class FullScreenBreak:
     def init_geometry(self, is_warning=False):
         self.canvas.delete("all")
         sw, sh = self._refresh_layout()
+        mon_x1, mon_y1, _, _ = self._mon_rect
         layout = self.layout
         close_stroke_width = max(2, scale_px(2.5, self.scale))
         close_icon_inset = max(scale_px(11, self.scale), layout.close_radius // 2)
@@ -123,22 +168,22 @@ class FullScreenBreak:
         close_y1 = layout.close_center_y - layout.close_radius
         close_x2 = layout.close_center_x + layout.close_radius
         close_y2 = layout.close_center_y + layout.close_radius
-        
+
         self.window.configure(bg=self.bg_color)
         self.canvas.configure(bg=self.bg_color)
         self.canvas.create_rectangle(0, 0, sw, sh, fill=self.bg_color, outline="")
-        
+
         if is_warning:
-            # Minimalist countdown style in a solid 100% alpha window at the top center
+            # Minimalist countdown style in a solid 100% alpha window at the top center of active monitor
             pill_w = scale_px(510, self.scale)
             pill_h = scale_px(40, self.scale)
-            x = sw // 2 - pill_w // 2
-            y = scale_px(40, self.scale)
-            self.warning_window.geometry(f"{pill_w}x{pill_h}+{x}+{y}")
-            
+            x = mon_x1 + sw // 2 - pill_w // 2
+            y = mon_y1 + scale_px(40, self.scale)
+            self.warning_window.geometry(f"{pill_w}x{pill_h}{_format_geometry_offset(x, y)}")
+
             self.warning_canvas.delete("all")
             self.warning_canvas.configure(width=pill_w, height=pill_h)
-            
+
             # Warning pill background (thick bright green outline, green background)
             pill_points = get_round_rect_points(0, 0, pill_w, pill_h, pill_h // 2)
             self.warning_pill_id = self.warning_canvas.create_polygon(
@@ -148,7 +193,7 @@ class FullScreenBreak:
                 width=max(2, scale_px(2.5, self.scale)),
                 smooth=True,
             )
-            
+
             self.warning_guide_text_id = self.warning_canvas.create_text(
                 pill_w // 2,
                 pill_h // 2,
@@ -158,7 +203,7 @@ class FullScreenBreak:
                 anchor="center",
                 justify=tk.CENTER,
             )
-            
+
             # Setup dummy/hidden elements on main canvas for compatibility/prevent errors
             self.active_arc_id = self.canvas.create_arc(
                 0, 0, 0, 0, start=0, extent=0, style=tk.ARC, outline="", width=0, state="hidden"
@@ -174,8 +219,6 @@ class FullScreenBreak:
             )
         else:
             # Redesigned solid background fullscreen layout (no central card)
-            
-            # Static background circle track
             self.canvas.create_oval(
                 layout.ring_x1,
                 layout.ring_y1,
@@ -184,7 +227,7 @@ class FullScreenBreak:
                 outline="#1d2e24",
                 width=layout.ring_thickness,
             )
-            
+
             # Active progress arc
             self.active_arc_id = self.canvas.create_arc(
                 layout.ring_x1,
@@ -197,7 +240,7 @@ class FullScreenBreak:
                 outline=COLOR_MINT_ACCENT,
                 width=layout.ring_thickness,
             )
-            
+
             # Countdown text
             self.txt_timer = self.canvas.create_text(
                 layout.timer_x,
@@ -207,7 +250,7 @@ class FullScreenBreak:
                 fill=COLOR_TEXT_PRIMARY,
                 justify=tk.CENTER,
             )
-            
+
             # Guide text
             guide_font_size = max(16, int(sh * 0.024))
             self.guide_text_id = self.canvas.create_text(
@@ -220,7 +263,7 @@ class FullScreenBreak:
                 justify=tk.CENTER,
                 width=layout.guide_width,
             )
-            
+
             # Close chip hover background
             self.close_chip_bg_id = self.canvas.create_oval(
                 close_x1,
@@ -233,7 +276,7 @@ class FullScreenBreak:
                 state="hidden",
                 tags="close_chip",
             )
-            
+
             # Close chip icon lines (X)
             self.canvas.create_line(
                 close_x1 + close_icon_inset,
@@ -255,7 +298,7 @@ class FullScreenBreak:
                 capstyle=tk.ROUND,
                 tags=("close_chip", "close_chip_icon"),
             )
-            
+
             self.canvas.tag_bind(
                 "close_chip", "<ButtonRelease-1>", lambda e: self.finish_early()
             )
@@ -269,7 +312,7 @@ class FullScreenBreak:
                 "<Leave>",
                 lambda e: self._set_close_chip_hover(False),
             )
-            
+
             self.canvas.tag_raise(self.txt_timer)
             self.canvas.tag_raise(self.guide_text_id)
             self.canvas.tag_raise(self.close_chip_bg_id)
@@ -282,41 +325,59 @@ class FullScreenBreak:
                 continue
             try:
                 self.window.after_cancel(job_id)
-            except tk.TclError:
+            except Exception:
                 pass
             setattr(self, job_name, None)
+
+        for job_id in self._warning_delay_jobs:
+            try:
+                self.window.after_cancel(job_id)
+            except Exception:
+                pass
+        self._warning_delay_jobs.clear()
+
+    def _reapply_warning_click_through(self, session_id):
+        if session_id == self._session_id and self._is_warning_active:
+            set_window_click_through(self.window)
+            set_window_click_through(self.warning_window)
 
     def show(self, is_warning=False):
         self._session_id += 1
         self._cancel_jobs()
+        self._break_completed = False
+        self._is_finishing = False
+        self._is_warning_active = is_warning
         self.init_geometry(is_warning=is_warning)
         session_id = self._session_id
+
         if is_warning:
             self._last_warning_remaining = None
             self._last_warning_alpha = 0.0
-            
+
             self.window.deiconify()
             self.warning_window.deiconify()
-            self.window.update()  # Force drawing and window mapping
+            self.window.update()
             self.warning_window.update()
-            
-            set_window_click_through(self.window)
-            set_window_click_through(self.warning_window)
-            
+
             self.window.attributes("-alpha", 0.0)
             self.warning_window.attributes("-alpha", 1.0)
-            
-            # Re-apply click-through after 50ms to ensure the OS wrapper window handles are fully linked
-            self.window.after(50, lambda: set_window_click_through(self.window))
-            self.warning_window.after(50, lambda: set_window_click_through(self.warning_window))
-            
+
+            set_window_click_through(self.window)
+            set_window_click_through(self.warning_window)
+
+            # Re-apply click-through after 50ms safely with session guard
+            job1 = self.window.after(
+                50, lambda: self._reapply_warning_click_through(session_id)
+            )
+            self._warning_delay_jobs.append(job1)
+
             # Record warning start time and kick off smooth 5Hz update job
             self._warning_start_time = time.time()
             self._warning_step(session_id)
         else:
             self.warning_window.withdraw()
             self.window.deiconify()
-            self.window.update()  # Force drawing and window mapping
+            self.window.update()
             remove_window_click_through(self.window)
             self.window.attributes("-alpha", 1.0)
             self.canvas.itemconfig("close_chip", state="normal")
@@ -327,6 +388,8 @@ class FullScreenBreak:
 
     def hide(self):
         self._session_id += 1
+        self._is_warning_active = False
+        self._is_finishing = False
         self._cancel_jobs()
         self.window.withdraw()
         self.warning_window.withdraw()
@@ -339,50 +402,65 @@ class FullScreenBreak:
             return
         total_dur = self.controller.config.warning_duration
         elapsed = time.time() - self._warning_start_time
-        
+
         if elapsed < total_dur:
-            # Smoothly transition alpha from 0.0 to 0.50
             current_alpha = 0.0 + 0.50 * (elapsed / total_dur)
-            # Only update window alpha if it differs significantly (>= 0.02) or it's the first frame
-            if self._last_warning_alpha is None or abs(current_alpha - self._last_warning_alpha) >= 0.02:
+            if (
+                self._last_warning_alpha is None
+                or abs(current_alpha - self._last_warning_alpha) >= 0.02
+            ):
                 self.window.attributes("-alpha", current_alpha)
                 self._last_warning_alpha = current_alpha
-            
-            # Clockwise filling active arc
+
             extent = -360 * (elapsed / total_dur)
-            self.canvas.itemconfig(self.active_arc_id, extent=extent, outline=COLOR_AMBER_WARNING)
-            
-            # Display ceiling rounded integer remaining seconds, only update text when it actually changes
+            self.canvas.itemconfig(
+                self.active_arc_id, extent=extent, outline=COLOR_AMBER_WARNING
+            )
+
             remaining = int(math.ceil(total_dur - elapsed))
             if remaining != self._last_warning_remaining:
                 warning_text = t("warning_text", remaining=remaining)
-                
-                # Dynamic width adaptation for the warning pill banner
-                text_width = _measure_text_width(warning_text, "Microsoft JhengHei UI", -scale_px(17, self.scale), True, self.scale)
-                
-                sw = self.window.winfo_screenwidth()
+
+                text_width = _measure_text_width(
+                    warning_text,
+                    "Microsoft JhengHei UI",
+                    -scale_px(17, self.scale),
+                    True,
+                    self.scale,
+                )
+
+                mon_x1, mon_y1, mon_x2, _ = getattr(
+                    self, "_mon_rect", (0, 0, self.window.winfo_screenwidth(), 0)
+                )
+                sw = mon_x2 - mon_x1
                 pill_h = scale_px(40, self.scale)
                 min_pill_w = scale_px(510, self.scale)
                 pill_w = max(min_pill_w, text_width + scale_px(40, self.scale))
-                
-                x = sw // 2 - pill_w // 2
-                y = scale_px(40, self.scale)
-                self.warning_window.geometry(f"{pill_w}x{pill_h}+{x}+{y}")
+
+                x = mon_x1 + sw // 2 - pill_w // 2
+                y = mon_y1 + scale_px(40, self.scale)
+                self.warning_window.geometry(f"{pill_w}x{pill_h}{_format_geometry_offset(x, y)}")
                 self.warning_canvas.configure(width=pill_w)
-                
+
                 pill_points = get_round_rect_points(0, 0, pill_w, pill_h, pill_h // 2)
                 self.warning_canvas.coords(self.warning_pill_id, *pill_points)
-                self.warning_canvas.coords(self.warning_guide_text_id, pill_w // 2, pill_h // 2)
-                
-                self.warning_canvas.itemconfig(self.warning_guide_text_id, text=warning_text, fill="#ffffff")
-                self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING)
+                self.warning_canvas.coords(
+                    self.warning_guide_text_id, pill_w // 2, pill_h // 2
+                )
+
+                self.warning_canvas.itemconfig(
+                    self.warning_guide_text_id, text=warning_text, fill="#ffffff"
+                )
+                self.canvas.itemconfig(
+                    self.txt_timer, text=f"{remaining:02d}", fill=COLOR_AMBER_WARNING
+                )
                 self._last_warning_remaining = remaining
-            
-            # Re-schedule after 200ms (5Hz) for buttery-smooth transition with low overhead
+
             self._countdown_job = self.window.after(
                 200, self._warning_step, session_id
             )
             return
+
         self._countdown_job = None
         self.controller.start_full_break()
 
@@ -392,31 +470,55 @@ class FullScreenBreak:
         if remaining > 0:
             total_dur = self.controller.config.break_duration
             extent = -360 * (remaining / total_dur)
-            self.canvas.itemconfig(self.active_arc_id, extent=extent, outline=COLOR_MINT_ACCENT)
-            
+            self.canvas.itemconfig(
+                self.active_arc_id, extent=extent, outline=COLOR_MINT_ACCENT
+            )
+
             self._apply_break_copy("countdown")
-            self.canvas.itemconfig(self.txt_timer, text=f"{remaining:02d}", fill=COLOR_TEXT_PRIMARY)
+            self.canvas.itemconfig(
+                self.txt_timer, text=f"{remaining:02d}", fill=COLOR_TEXT_PRIMARY
+            )
             self.canvas.itemconfig(self.guide_text_id, fill=COLOR_MINT_ACCENT)
             self._countdown_job = self.window.after(
                 1000, self._countdown_step, remaining - 1, session_id
             )
             return
+
         self._countdown_job = None
+        self._break_completed = True
         self._apply_break_copy("complete")
         self.canvas.itemconfig(self.txt_timer, text="00", fill=COLOR_MINT_ACCENT)
         self.canvas.itemconfig(self.active_arc_id, extent=0)
-        safe_play_sound("SystemAsterisk")
+        if getattr(self.controller.config, "sound_enabled", True):
+            safe_play_sound("SystemAsterisk")
         self._finish_job = self.window.after(2000, self.finish)
 
-    def finish_early(self):
+    def finish_early(self, _event=None):
         if self.window.state() == "withdrawn":
             return
+        if self._is_warning_active:
+            self.finish_snooze()
+            return
+        # If the break completed already, closing dismisses the completion view immediately
+        if self._break_completed:
+            self.finish()
+            return
+        # If already finishing or skipping, avoid double trigger
+        if self._is_finishing:
+            return
+        self._is_finishing = True
         self._cancel_jobs()
         self._apply_break_copy("skipped")
         self.canvas.itemconfig(self.txt_timer, text="")
         self.canvas.itemconfig(self.active_arc_id, extent=0)
-        safe_play_sound("SystemAsterisk")
-        self._finish_job = self.window.after(1000, self.finish)
+        if getattr(self.controller.config, "sound_enabled", True):
+            safe_play_sound("SystemAsterisk")
+        # Interrupted break: snooze for shorter interval so user is reminded later
+        self._finish_job = self.window.after(1000, self.finish_snooze)
+
+    def finish_snooze(self):
+        self.hide()
+        self.controller.snooze()
 
     def finish(self):
         self.hide()
@@ -458,7 +560,7 @@ class FloatingWidget:
             self.metrics.center_y,
             text="",
             anchor="w",
-            font=("Microsoft JhengHei UI", 10, "bold"),
+            font=("Microsoft JhengHei UI", -scale_px(13, self.scale), "bold"),
             fill=COLOR_MINT_ACCENT,
         )
         self.btn_pause = self.canvas.create_rectangle(
@@ -498,56 +600,98 @@ class FloatingWidget:
         self.canvas.bind("<ButtonPress-1>", self.start_move)
         self.canvas.bind("<B1-Motion>", self.do_move)
         self.canvas.bind("<ButtonRelease-1>", self.on_click)
+        self.canvas.bind("<ButtonPress-3>", self.on_right_click)
         self.canvas.bind("<Enter>", self.on_hover)
         self.canvas.bind("<Leave>", self.on_leave)
         self.canvas.bind("<Motion>", self.on_motion)
         self.window.update_idletasks()
-        sw = self.window.winfo_screenwidth()
-        sh = self.window.winfo_screenheight()
+
+        # Initial geometry positioning (bottom-right of initial work area)
         w_collapsed = scale_px(44, self.scale)
         h = self.metrics.height
-        x = sw - w_collapsed - self.metrics.margin_right
-        y = sh - h - self.metrics.margin_bottom
-        self.window.geometry(f"{w_collapsed}x{h}+{x}+{y}")
+        try:
+            raw_sw = self.window.winfo_screenwidth()
+            sw = int(raw_sw) if isinstance(raw_sw, (int, float)) and not isinstance(raw_sw, bool) else 1920
+        except Exception:
+            sw = 1920
+        try:
+            raw_sh = self.window.winfo_screenheight()
+            sh = int(raw_sh) if isinstance(raw_sh, (int, float)) and not isinstance(raw_sh, bool) else 1080
+        except Exception:
+            sh = 1080
+
+        work_x1, work_y1, work_x2, work_y2 = get_monitor_work_area(
+            self.window,
+            fallback_size=(sw, sh),
+        )
+        x = work_x2 - w_collapsed - self.metrics.margin_right
+        y = work_y2 - h - self.metrics.margin_bottom
+        self.window.geometry(f"{w_collapsed}x{h}{_format_geometry_offset(x, y)}")
+
         self._x = 0
         self._y = 0
         self._dragged = False
         self._collapse_job = None
         self._expanded = False
+        self._expand_direction = "left"
         self._pause_hovered = False
         self._close_hovered = False
         self._pressed_control = None
         self.update_pause_ui()
 
-    def _update_dynamic_layout(self):
+    @property
+    def is_expanded(self) -> bool:
+        return self._expanded
+
+    def refresh_expanded_status(self):
+        if not self._expanded:
+            return
+        self.update_pause_ui()
+
+    def on_right_click(self, _event=None):
+        if self.controller.state in ("WARNING", "BREAKING"):
+            self.controller.snooze()
+
+    def _get_status_text(self):
         paused = getattr(self.controller, "paused", False)
-        text = t("paused") if paused else t("protecting")
-        
-        text_width = _measure_text_width(text, "Microsoft JhengHei UI", 10, True, self.scale)
-        
+        if paused:
+            return t("paused")
+        rem = getattr(self.controller, "remaining_seconds", 0)
+        return f"{t('protecting')} {format_remaining_mmss(rem)}"
+
+    def _update_dynamic_layout(self):
+        text = self._get_status_text()
+        text_width = _measure_text_width(
+            text,
+            "Microsoft JhengHei UI",
+            -scale_px(13, self.scale),
+            True,
+            self.scale,
+        )
+
         scale = self.scale
         min_pause_x1 = scale_px(114, scale)
         pause_x1 = max(min_pause_x1, self.metrics.label_x + text_width + scale_px(8, scale))
-        
+
         control_size = scale_px(32, scale)
         pause_x2 = pause_x1 + control_size
         pause_center_x = (pause_x1 + pause_x2) // 2
-        
+
         close_x1 = pause_x2 + scale_px(8, scale)
         close_x2 = close_x1 + control_size
         close_center_x = (close_x1 + close_x2) // 2
-        
+
         w_expanded = close_x2 + scale_px(9, scale)
-        
+
         from dataclasses import replace
-        
+
         expanded_rect = (
             scale_px(2, scale),
             scale_px(2, scale),
             w_expanded - scale_px(2, scale),
             self.metrics.height - scale_px(2, scale),
         )
-        
+
         self.metrics = replace(
             self.metrics,
             window_width=w_expanded,
@@ -556,15 +700,23 @@ class FloatingWidget:
             close_box=make_box(close_center_x, self.metrics.center_y, control_size),
         )
         self.hover_coords = expanded_rect
-        
+
         if self._expanded:
             self.canvas.configure(width=w_expanded)
-            right_x = self.window.winfo_x() + self.window.winfo_width()
-            h = self.metrics.height
-            new_x = right_x - w_expanded
+            curr_x = self.window.winfo_x()
+            curr_w = self.window.winfo_width()
             y = self.window.winfo_y()
-            self.window.geometry(f"{w_expanded}x{h}+{new_x}+{y}")
-            
+            h = self.metrics.height
+
+            # Recompute position based on expand direction
+            if self._expand_direction == "right":
+                new_x = curr_x
+            else:
+                right_x = curr_x + curr_w
+                new_x = right_x - w_expanded
+
+            self.window.geometry(f"{w_expanded}x{h}{_format_geometry_offset(new_x, y)}")
+
             new_points = get_round_rect_points(*expanded_rect, self.metrics.radius)
             self.canvas.coords(self.bg_id, *new_points)
             self.canvas.coords(self.btn_pause, *self.metrics.pause_box)
@@ -587,20 +739,12 @@ class FloatingWidget:
                 return "close"
         return None
 
-    def _reset_pointer_state(self):
-        self._pressed_control = None
-        self._dragged = False
-
-    def _raise_control_hitboxes(self):
-        self.canvas.tag_raise(self.btn_pause)
-        self.canvas.tag_raise(self.btn_close)
-
     def _cancel_collapse(self):
         if self._collapse_job is None:
             return
         try:
             self.window.after_cancel(self._collapse_job)
-        except tk.TclError:
+        except Exception:
             pass
         self._collapse_job = None
 
@@ -609,13 +753,13 @@ class FloatingWidget:
             pointer_widget = self.window.winfo_containing(
                 *self.window.winfo_pointerxy()
             )
-        except tk.TclError:
+        except Exception:
             return False
         if pointer_widget is None:
             return False
         try:
             return pointer_widget.winfo_toplevel() == self.window
-        except tk.TclError:
+        except Exception:
             return False
 
     def _collapse_if_pointer_left(self):
@@ -627,15 +771,23 @@ class FloatingWidget:
         old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
         self.window.attributes("-alpha", 0.75)
         self.canvas.coords(self.bg_id, *old_points)
-        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL)
+        self.canvas.itemconfig(
+            self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL
+        )
         if self._expanded:
-            # Resize window to collapsed width and slide right
-            right_x = self.window.winfo_x() + self.window.winfo_width()
+            curr_x = self.window.winfo_x()
+            curr_w = self.window.winfo_width()
             w_collapsed = scale_px(44, self.scale)
             h = self.metrics.height
-            new_x = right_x - w_collapsed
             y = self.window.winfo_y()
-            self.window.geometry(f"{w_collapsed}x{h}+{new_x}+{y}")
+
+            if self._expand_direction == "right":
+                new_x = curr_x
+            else:
+                right_x = curr_x + curr_w
+                new_x = right_x - w_collapsed
+
+            self.window.geometry(f"{w_collapsed}x{h}{_format_geometry_offset(new_x, y)}")
             self._expanded = False
         self._pause_hovered = False
         self._close_hovered = False
@@ -645,7 +797,10 @@ class FloatingWidget:
         self.canvas.delete("pause_control")
         self.canvas.delete("close_control")
         self.update_pause_ui()
-        self.window.config(cursor="arrow")
+        try:
+            self.window.config(cursor="arrow")
+        except Exception:
+            pass
 
     def _draw_eye(self, state):
         self.canvas.delete("icon_parts")
@@ -885,17 +1040,24 @@ class FloatingWidget:
 
     def update_pause_ui(self):
         self._update_dynamic_layout()
-        if getattr(self.controller, "paused", False):
+        paused = getattr(self.controller, "paused", False)
+        status_text = self._get_status_text()
+        if paused:
             self._draw_eye("closed")
             if self._expanded:
-                self.canvas.itemconfig(self.txt_label, text=t("paused"), fill=COLOR_AMBER_WARNING)
+                self.canvas.itemconfig(
+                    self.txt_label, text=status_text, fill=COLOR_AMBER_WARNING
+                )
             self._draw_pause_control()
             self._draw_close_control()
             self._raise_control_hitboxes()
             return
+
         self._draw_eye("open")
         if self._expanded:
-            self.canvas.itemconfig(self.txt_label, text=t("protecting"), fill=COLOR_MINT_ACCENT)
+            self.canvas.itemconfig(
+                self.txt_label, text=status_text, fill=COLOR_MINT_ACCENT
+            )
         self._draw_pause_control()
         self._draw_close_control()
         self._raise_control_hitboxes()
@@ -927,27 +1089,29 @@ class FloatingWidget:
         self._dragged = True
         deltax = event.x - self._x
         deltay = event.y - self._y
-        x = self.window.winfo_x() + deltax
-        y = self.window.winfo_y() + deltay
 
-        # Boundary check to prevent moving window off screen
-        sw = self.window.winfo_screenwidth()
-        sh = self.window.winfo_screenheight()
-        w = self.window.winfo_width()
-        h = self.window.winfo_height()
-        x = max(0, min(x, sw - w))
-        y = max(0, min(y, sh - h))
+        try:
+            curr_x = int(self.window.winfo_x())
+            curr_y = int(self.window.winfo_y())
+            w = int(self.window.winfo_width())
+            h = int(self.window.winfo_height())
+            x = curr_x + deltax
+            y = curr_y + deltay
 
-        self.window.geometry(f"+{x}+{y}")
+            # Support multi-monitor virtual screen bounds
+            vx1, vy1, vx2, vy2 = get_virtual_screen_rect()
+            x = max(vx1, min(x, vx2 - w))
+            y = max(vy1, min(y, vy2 - h))
+            self.window.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
 
     def on_click(self, event):
         self._pressed_control = None
         if self._dragged:
             self._dragged = False
-            # Check and update DPI if it changed after drag release
             self._check_and_update_dpi()
             return
-        # Check if the click is on the eye icon
         ix1, iy1, ix2, iy2 = self.metrics.icon_box
         if ix1 <= event.x <= ix2 and iy1 <= event.y <= iy2:
             if not self.controller.paused:
@@ -965,22 +1129,51 @@ class FloatingWidget:
         self.update_pause_ui()
         new_points = get_round_rect_points(*self.hover_coords, self.metrics.radius)
         self.canvas.coords(self.bg_id, *new_points)
-        self.canvas.itemconfig(self.bg_id, fill=self.bg_color_hover, outline=COLOR_FLOATING_BORDER_HOVER)
+        self.canvas.itemconfig(
+            self.bg_id, fill=self.bg_color_hover, outline=COLOR_FLOATING_BORDER_HOVER
+        )
         if not self._expanded:
-            # Resize window to expanded width and slide left
-            right_x = self.window.winfo_x() + self.window.winfo_width()
-            w_expanded = self.metrics.window_width
-            h = self.metrics.height
-            new_x = right_x - w_expanded
-            y = self.window.winfo_y()
-            self.window.geometry(f"{w_expanded}x{h}+{new_x}+{y}")
-            self.canvas.configure(width=w_expanded)
+            try:
+                curr_x = int(self.window.winfo_x())
+                curr_y = int(self.window.winfo_y())
+                curr_w = int(self.window.winfo_width())
+                w_expanded = self.metrics.window_width
+                h = self.metrics.height
+
+                # Check if expanding to the left causes the widget to cross the left work area edge
+                work_x1, _, _, _ = get_monitor_work_area(
+                    self.window,
+                    point=(curr_x, curr_y),
+                    fallback_size=(
+                        self.window.winfo_screenwidth(),
+                        self.window.winfo_screenheight(),
+                    ),
+                )
+                right_x = curr_x + curr_w
+                left_expanded_x = right_x - w_expanded
+
+                if left_expanded_x < work_x1:
+                    # Near left edge: expand to the right instead of left
+                    self._expand_direction = "right"
+                    new_x = curr_x
+                else:
+                    self._expand_direction = "left"
+                    new_x = left_expanded_x
+
+                self.window.geometry(f"{w_expanded}x{h}{_format_geometry_offset(new_x, curr_y)}")
+            except Exception:
+                pass
+            self.canvas.configure(width=self.metrics.window_width)
             self._expanded = True
             self.update_pause_ui()
+
         self.canvas.itemconfig(self.btn_pause, state="normal")
         self.canvas.itemconfig(self.btn_close, state="normal")
         self._raise_control_hitboxes()
-        self.window.config(cursor="hand2")
+        try:
+            self.window.config(cursor="hand2")
+        except Exception:
+            pass
 
     def on_leave(self, _event):
         self._cancel_collapse()
@@ -994,16 +1187,25 @@ class FloatingWidget:
         self._pressed_control = None
         self._dragged = False
         if self._expanded:
-            # Revert window layout to collapsed state on hide
             old_points = get_round_rect_points(*self.normal_coords, self.metrics.radius)
             self.canvas.coords(self.bg_id, *old_points)
-            self.canvas.itemconfig(self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL)
+            self.canvas.itemconfig(
+                self.bg_id, fill=self.bg_color_normal, outline=COLOR_FLOATING_BORDER_NORMAL
+            )
             w_collapsed = scale_px(44, self.scale)
             h = self.metrics.height
-            right_x = self.window.winfo_x() + self.window.winfo_width()
-            new_x = right_x - w_collapsed
-            y = self.window.winfo_y()
-            self.window.geometry(f"{w_collapsed}x{h}+{new_x}+{y}")
+            try:
+                curr_x = int(self.window.winfo_x())
+                curr_y = int(self.window.winfo_y())
+                curr_w = int(self.window.winfo_width())
+                if self._expand_direction == "right":
+                    new_x = curr_x
+                else:
+                    right_x = curr_x + curr_w
+                    new_x = right_x - w_collapsed
+                self.window.geometry(f"{w_collapsed}x{h}{_format_geometry_offset(new_x, curr_y)}")
+            except Exception:
+                pass
             self._expanded = False
             self.canvas.itemconfig(self.btn_pause, state="hidden")
             self.canvas.itemconfig(self.btn_close, state="hidden")
@@ -1016,6 +1218,10 @@ class FloatingWidget:
         if self.window.state() == "withdrawn":
             self.window.deiconify()
 
+    def _raise_control_hitboxes(self):
+        self.canvas.tag_raise(self.btn_pause)
+        self.canvas.tag_raise(self.btn_close)
+
     def _check_and_update_dpi(self):
         new_scale = get_window_dpi_scale(self.window)
         if new_scale != self.scale:
@@ -1024,37 +1230,36 @@ class FloatingWidget:
             self.normal_coords = self.metrics.collapsed_rect
             self.hover_coords = self.metrics.expanded_rect
 
-            # Reconfigure canvas dimension
             self.canvas.configure(
                 width=self.metrics.window_width,
-                height=self.metrics.height
+                height=self.metrics.height,
             )
 
-            # Re-coords background polygon
             points = get_round_rect_points(
                 *(self.hover_coords if self._expanded else self.normal_coords),
-                self.metrics.radius
+                self.metrics.radius,
             )
             self.canvas.coords(self.bg_id, *points)
             self.canvas.itemconfig(self.bg_id, width=self.metrics.outline_width)
 
-            # Re-coords label and reset scaled font size
-            self.canvas.coords(self.txt_label, self.metrics.label_x, self.metrics.center_y)
+            self.canvas.coords(
+                self.txt_label, self.metrics.label_x, self.metrics.center_y
+            )
             self.canvas.itemconfig(
                 self.txt_label,
-                font=("Microsoft JhengHei UI", 10, "bold")
+                font=("Microsoft JhengHei UI", -scale_px(13, self.scale), "bold"),
             )
 
-            # Re-coords buttons hitbox
             self.canvas.coords(self.btn_pause, *self.metrics.pause_box)
             self.canvas.coords(self.btn_close, *self.metrics.close_box)
 
-            # Repaint controls
             self.update_pause_ui()
 
-            # Adjust window geometry
-            w = self.metrics.window_width if self._expanded else scale_px(44, self.scale)
-            h = self.metrics.height
-            x = self.window.winfo_x()
-            y = self.window.winfo_y()
-            self.window.geometry(f"{w}x{h}+{x}+{y}")
+            try:
+                w = self.metrics.window_width if self._expanded else scale_px(44, self.scale)
+                h = self.metrics.height
+                x = int(self.window.winfo_x())
+                y = int(self.window.winfo_y())
+                self.window.geometry(f"{w}x{h}{_format_geometry_offset(x, y)}")
+            except Exception:
+                pass

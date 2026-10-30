@@ -35,7 +35,12 @@ def toggle_pause(runtime):
     return replace(runtime, paused=paused, time_elapsed=time_elapsed)
 
 
-def apply_tick(runtime, config, busy_reason=BUSY_REASON_NONE):
+def apply_tick(
+    runtime,
+    config,
+    busy_reason=BUSY_REASON_NONE,
+    elapsed_delta: int | None = None,
+):
     if not runtime.running:
         return TickResult(runtime)
     if runtime.state != STATE_RUNNING:
@@ -51,7 +56,12 @@ def apply_tick(runtime, config, busy_reason=BUSY_REASON_NONE):
     if updated.paused:
         return TickResult(updated)
 
-    elapsed = updated.time_elapsed + config.poll_interval
+    if elapsed_delta is None:
+        delta = config.poll_interval
+    else:
+        delta = max(1, elapsed_delta)
+
+    elapsed = updated.time_elapsed + delta
     if elapsed >= updated.target_interval:
         return TickResult(
             replace(

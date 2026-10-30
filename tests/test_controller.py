@@ -67,6 +67,8 @@ class FakeFloating:
         self.show_calls = 0
         self.hide_calls = 0
         self.update_pause_ui_calls = 0
+        self.refresh_calls = 0
+        self.is_expanded = False
 
     def show(self):
         self.show_calls += 1
@@ -76,6 +78,9 @@ class FakeFloating:
 
     def update_pause_ui(self):
         self.update_pause_ui_calls += 1
+
+    def refresh_expanded_status(self):
+        self.refresh_calls += 1
 
 
 class FakeFullscreen:
@@ -196,9 +201,14 @@ class ControllerTests(unittest.TestCase):
             running=controller.runtime.running,
         )
 
+        controller.floating.is_expanded = True
+        controller.floating.refresh_expanded_status = mock.Mock()
+
         controller.snooze()
 
         self.assertEqual(controller.runtime.state, STATE_RUNNING)
+        self.assertEqual(controller.fullscreen.hide_calls, 1)
+        controller.floating.refresh_expanded_status.assert_called_once()
         self.assertEqual(root.after_calls[-1][0], TEST_CONFIG.poll_interval * 1000)
         self.assertIsNotNone(controller._tick_job)
 
@@ -257,12 +267,72 @@ class ControllerTests(unittest.TestCase):
         root, controller = self._build_controller()
         from eyes_protector.core import BUSY_REASON_IDLE
         controller._effective_busy_reason = BUSY_REASON_IDLE
-        
+
         controller._cancel_tick()
         root.after_calls.clear()
-        
+
         controller._sync_tick_schedule()
         self.assertEqual(root.after_calls[0][0], 5000)
+
+    def test_remaining_seconds_property(self):
+        _, controller = self._build_controller()
+        controller.runtime = controller.runtime.__class__(
+            time_elapsed=3,
+            target_interval=10,
+            state=STATE_RUNNING,
+            paused=False,
+            floating_visible=True,
+            running=True,
+        )
+        self.assertEqual(controller.remaining_seconds, 7)
+
+    def test_sleep_wakeup_wall_clock_jump_resets_elapsed_time(self):
+        root, controller = self._build_controller()
+        controller.runtime = controller.runtime.__class__(
+            time_elapsed=8,
+            target_interval=10,
+            state=STATE_RUNNING,
+            paused=False,
+            floating_visible=True,
+            running=True,
+        )
+
+        # Simulate waking up from system sleep: wall time jumped by 1000s (> idle_threshold of 20s)
+        # Even if user just tapped a key so get_idle_time() is 0.1s
+        with mock.patch("eyes_protector.controller.get_idle_time", return_value=0.1):
+            with mock.patch("eyes_protector.controller.get_platform_busy_reason", return_value=BUSY_REASON_NONE):
+                controller._last_tick_wall = 1000.0
+                controller._last_tick_monotonic = 50.0
+                with mock.patch("time.time", return_value=2500.0): # +1500s
+                    with mock.patch("time.monotonic", return_value=51.0):
+                        controller.run_timer()
+
+        # Elapsed time should be reset to 0 due to idle/sleep detection!
+        self.assertEqual(controller.runtime.time_elapsed, 0)
+        self.assertFalse(controller.runtime.floating_visible)
+
+    def test_monotonic_drift_compensation(self):
+        root, controller = self._build_controller()
+        controller.runtime = controller.runtime.__class__(
+            time_elapsed=2,
+            target_interval=10,
+            state=STATE_RUNNING,
+            paused=False,
+            floating_visible=True,
+            running=True,
+        )
+
+        # Simulate 2.8s elapsed on main thread
+        with mock.patch("eyes_protector.controller.get_idle_time", return_value=0):
+            with mock.patch("eyes_protector.controller.get_platform_busy_reason", return_value=BUSY_REASON_NONE):
+                controller._last_tick_wall = 100.0
+                controller._last_tick_monotonic = 100.0
+                with mock.patch("time.time", return_value=102.8):
+                    with mock.patch("time.monotonic", return_value=102.8):
+                        controller.run_timer()
+
+        # 2 + round(2.8) = 5
+        self.assertEqual(controller.runtime.time_elapsed, 5)
 
 
 if __name__ == "__main__":

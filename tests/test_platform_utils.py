@@ -3,7 +3,11 @@ import unittest
 from unittest import mock
 
 from eyes_protector import platform_utils
-from eyes_protector.core import BUSY_REASON_FULLSCREEN, BUSY_REASON_NONE
+from eyes_protector.core import (
+    BUSY_REASON_FULLSCREEN,
+    BUSY_REASON_IDLE,
+    BUSY_REASON_NONE,
+)
 
 
 class PlatformUtilsTests(unittest.TestCase):
@@ -58,6 +62,16 @@ class PlatformUtilsTests(unittest.TestCase):
                     platform_utils.get_platform_busy_reason(), BUSY_REASON_FULLSCREEN
                 )
 
+    def test_get_platform_busy_reason_screen_lock_returns_idle(self):
+        # QUNS_NOT_PRESENT (1) = lock screen
+        with mock.patch(
+            "eyes_protector.platform_utils._query_user_notification_state",
+            return_value=1,
+        ):
+            self.assertEqual(
+                platform_utils.get_platform_busy_reason(), BUSY_REASON_IDLE
+            )
+
     def test_get_platform_busy_reason_detects_fullscreen_window_even_with_activity(
         self,
     ):
@@ -85,6 +99,46 @@ class PlatformUtilsTests(unittest.TestCase):
                 self.assertEqual(
                     platform_utils.get_platform_busy_reason(), BUSY_REASON_NONE
                 )
+
+    def test_foreground_window_covers_monitor_ignores_shell_and_desktop_classes(self):
+        with mock.patch("ctypes.windll.user32.GetForegroundWindow", return_value=12345):
+            with mock.patch("ctypes.windll.user32.IsIconic", return_value=False):
+                with mock.patch("ctypes.windll.user32.IsWindowVisible", return_value=True):
+                    # Test GetShellWindow match
+                    with mock.patch("ctypes.windll.user32.GetShellWindow", return_value=12345):
+                        self.assertFalse(platform_utils._foreground_window_covers_monitor())
+
+                    # Test Progman / WorkerW class match
+                    with mock.patch("ctypes.windll.user32.GetShellWindow", return_value=99999):
+                        def mock_get_class_name(hwnd, buf, size):
+                            buf.value = "Progman"
+                            return len("Progman")
+
+                        with mock.patch(
+                            "ctypes.windll.user32.GetClassNameW",
+                            side_effect=mock_get_class_name,
+                        ):
+                            self.assertFalse(platform_utils._foreground_window_covers_monitor())
+
+    def test_multi_monitor_helpers_fallback_safely(self):
+        # When user32 calls raise or fail, fallback sizes should be returned
+        with mock.patch("ctypes.windll.user32.GetSystemMetrics", side_effect=RuntimeError):
+            rect = platform_utils.get_virtual_screen_rect(fallback_size=(2560, 1440))
+            self.assertEqual(rect, (0, 0, 2560, 1440))
+
+        with mock.patch("ctypes.windll.user32.GetCursorPos", return_value=False):
+            with mock.patch("ctypes.windll.user32.MonitorFromWindow", return_value=0):
+                work_area = platform_utils.get_monitor_work_area(fallback_size=(1920, 1080))
+                self.assertEqual(work_area, (0, 0, 1920, 1080))
+
+                active_mon = platform_utils.get_active_monitor_rect(fallback_size=(1920, 1080))
+                self.assertEqual(active_mon, (0, 0, 1920, 1080))
+
+    def test_get_idle_time_handles_exception(self):
+        with mock.patch(
+            "ctypes.windll.user32.GetLastInputInfo", side_effect=Exception("win32 error")
+        ):
+            self.assertEqual(platform_utils.get_idle_time(), 0.0)
 
     def test_check_single_instance_exits_when_mutex_creation_fails(self):
         root = mock.Mock()
@@ -157,22 +211,18 @@ class PlatformUtilsTests(unittest.TestCase):
     def test_check_single_instance_already_running_user_says_yes_close_success(self):
         root = mock.Mock()
         mutex = object()
-        # Mock create_single_instance_mutex to return a valid mutex and ERROR_ALREADY_EXISTS
         with mock.patch(
             "eyes_protector.platform_utils.create_single_instance_mutex",
             return_value=(mutex, platform_utils.ERROR_ALREADY_EXISTS),
         ):
-            # Mock askyesno to return True (User clicked "Yes" to close)
             with mock.patch(
                 "eyes_protector.platform_utils.messagebox.askyesno",
                 return_value=True,
             ) as askyesno_mock:
-                # Mock force_close_existing_instance to return True (Successfully closed)
                 with mock.patch(
                     "eyes_protector.platform_utils.force_close_existing_instance",
                     return_value=True,
                 ) as force_close_mock:
-                    # Mock showinfo to ensure it's not called on success
                     with mock.patch(
                         "eyes_protector.platform_utils.messagebox.showinfo"
                     ) as showinfo_mock:

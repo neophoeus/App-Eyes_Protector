@@ -1,10 +1,12 @@
+import time
+
 from .core import (
     BUSY_REASON_FULLSCREEN,
     BUSY_REASON_IDLE,
     BUSY_REASON_NONE,
+    STATE_BREAKING,
     STATE_RUNNING,
     STATE_WARNING,
-    STATE_BREAKING,
     apply_finish_break,
     apply_quit,
     apply_snooze,
@@ -30,6 +32,8 @@ class EyesProtectorController:
         self._fullscreen_busy_streak = 0
         self._fullscreen_clear_streak = 0
         self._quitting = False
+        self._last_tick_monotonic = time.monotonic()
+        self._last_tick_wall = time.time()
         self._set_floating_visibility(self.runtime.floating_visible)
         self._sync_tick_schedule(100)
 
@@ -40,6 +44,10 @@ class EyesProtectorController:
     @property
     def state(self):
         return self.runtime.state
+
+    @property
+    def remaining_seconds(self):
+        return max(0, self.runtime.target_interval - self.runtime.time_elapsed)
 
     def _should_schedule_tick(self):
         return (
@@ -130,6 +138,8 @@ class EyesProtectorController:
             self._set_floating_visibility(True)
         else:
             self.runtime = toggle_pause(self.runtime)
+        self._last_tick_monotonic = time.monotonic()
+        self._last_tick_wall = time.time()
         self.floating.update_pause_ui()
         self._sync_tick_schedule()
 
@@ -137,21 +147,51 @@ class EyesProtectorController:
         self._tick_job = None
         if not self.runtime.running:
             return
-        busy_reason = self._detect_busy_reason()
-        tick_result = apply_tick(self.runtime, self.config, busy_reason)
+
+        now_mono = time.monotonic()
+        now_wall = time.time()
+        wall_delta = now_wall - self._last_tick_wall
+        mono_delta = now_mono - self._last_tick_monotonic
+        self._last_tick_monotonic = now_mono
+        self._last_tick_wall = now_wall
+
+        # Detect system suspend / sleep: large wall-clock jump even if last input is fresh
+        if wall_delta >= self.config.idle_threshold:
+            busy_reason = self._resolve_busy_reason(BUSY_REASON_IDLE)
+        else:
+            busy_reason = self._detect_busy_reason()
+
+        if mono_delta < self.config.poll_interval:
+            elapsed_delta = self.config.poll_interval
+        else:
+            elapsed_delta = min(int(round(mono_delta)), self.config.idle_threshold)
+
+        tick_result = apply_tick(
+            self.runtime, self.config, busy_reason, elapsed_delta=elapsed_delta
+        )
         previous_visibility = self.runtime.floating_visible
         self.runtime = tick_result.runtime
         if previous_visibility != self.runtime.floating_visible:
             self._set_floating_visibility(self.runtime.floating_visible)
         if tick_result.should_start_warning:
             self.start_warning()
+        elif getattr(self.floating, "is_expanded", False):
+            if hasattr(self.floating, "refresh_expanded_status"):
+                self.floating.refresh_expanded_status()
+
         self._sync_tick_schedule()
 
     def snooze(self):
+        if self.runtime.state in (STATE_WARNING, STATE_BREAKING):
+            self.fullscreen.hide()
         previous_visibility = self.runtime.floating_visible
         self.runtime = apply_snooze(self.runtime, self.config)
         if previous_visibility != self.runtime.floating_visible:
             self._set_floating_visibility(self.runtime.floating_visible)
+        if getattr(self.floating, "is_expanded", False) and hasattr(self.floating, "refresh_expanded_status"):
+            self.floating.refresh_expanded_status()
+        self._last_tick_monotonic = time.monotonic()
+        self._last_tick_wall = time.time()
         self._sync_tick_schedule()
 
     def start_warning(self):
@@ -187,6 +227,10 @@ class EyesProtectorController:
         self.runtime = apply_finish_break(self.runtime, self.config)
         if previous_visibility != self.runtime.floating_visible:
             self._set_floating_visibility(self.runtime.floating_visible)
+        if getattr(self.floating, "is_expanded", False) and hasattr(self.floating, "refresh_expanded_status"):
+            self.floating.refresh_expanded_status()
+        self._last_tick_monotonic = time.monotonic()
+        self._last_tick_wall = time.time()
         self._sync_tick_schedule()
 
     def _destroy_windows(self):
